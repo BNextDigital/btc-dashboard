@@ -84,7 +84,7 @@ const FONT_LINK = `
   }
 `;
 
-
+const API = process.env.NEXT_PUBLIC_API_URL;
 
 type Metric = {
   id: string;
@@ -102,7 +102,6 @@ type Metric = {
   updated: string;
   _is_override: boolean;
 };
-
 
 const TOP_EVENTS = [
   { idx: "01", title: "Strategy announces 8,100 BTC purchase", time: "06:15 UTC", tag: "Corporate Flow" },
@@ -132,8 +131,6 @@ const alertClasses = (level: string) => {
     default: return { text: "text-muted", bg: "bg-surface-2", border: "hairline" };
   }
 };
-
-
 
 const Sparkline = ({ data, dir = "up" }: { data: number[]; dir?: string }) => {
   const w = 80, h = 24;
@@ -199,17 +196,17 @@ const MetricCard = ({ metric, index }: { metric: Metric; index: number }) => {
         <span className="caps-sm text-faint">Pattern</span>
         <span className={`font-sans-body text-[11px] ${metric.pattern === "—" ? "text-faint" : "text-paper-2 italic"}`}>{metric.pattern}</span>
       </div>
-<div className="flex items-center gap-1 text-faint">
-  <Circle
-    size={5}
-    fill={metric._is_override ? "#D9A84D" : "#8DA078"}
-    stroke="none"
-    className="pulse-dot"
-  />
-  <span className="caps-sm">
-    {metric._is_override ? "Manual · screenshot" : `Updated ${metric.updated}`}
-  </span>
-</div>
+      <div className="flex items-center gap-1 text-faint">
+        <Circle
+          size={5}
+          fill={metric._is_override ? "#D9A84D" : "#8DA078"}
+          stroke="none"
+          className="pulse-dot"
+        />
+        <span className="caps-sm">
+          {metric._is_override ? "Manual · screenshot" : `Updated ${metric.updated}`}
+        </span>
+      </div>
     </div>
   );
 };
@@ -258,7 +255,6 @@ const TopEvents = ({ items }: { items: Array<{ title: string; source: string; ti
     </button>
   </div>
 );
-
 
 const CausalAnalysis = ({ data }: {
   data: { chain: Array<{label: string; state: string; weight: string}>; contradiction: string } | null
@@ -344,7 +340,7 @@ const JudgmentPanel = ({ state, setState }: { state: JudgmentState; setState: Re
     setCommitError(null);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/judgment", {
+      const res = await fetch(`${API}/judgment`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
@@ -361,8 +357,6 @@ const JudgmentPanel = ({ state, setState }: { state: JudgmentState; setState: Re
       const data = await res.json();
 
       setCommitted(`Committed · Entry #${data.id} · ${new Date(data.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC`);
-
-      // Clear the form after successful commit
       setState({ read: "", supports: "", contradicts: "", invalidates: "", plan: "", risk: null });
 
     } catch (e) {
@@ -453,6 +447,7 @@ const JudgmentPanel = ({ state, setState }: { state: JudgmentState; setState: Re
     </div>
   );
 };
+
 const ManualOverridePanel = () => {
   const [input, setInput]     = useState("");
   const [status, setStatus]   = useState<"idle" | "success" | "error">("idle");
@@ -466,13 +461,12 @@ const ManualOverridePanel = () => {
     setMessage(null);
 
     try {
-      // Support single object or array of objects
       const raw = JSON.parse(input.trim());
       const entries = Array.isArray(raw) ? raw : [raw];
 
       const results = await Promise.all(
         entries.map((entry) =>
-          fetch("http://127.0.0.1:8000/manual-override", {
+          fetch(`${API}/manual-override`, {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
             body:    JSON.stringify(entry),
@@ -490,7 +484,6 @@ const ManualOverridePanel = () => {
           `${results.length} metric${results.length > 1 ? "s" : ""} updated — ${results.map((r) => r.metric).join(", ")}`
         );
         setInput("");
-        // Trigger a metrics refresh
         setTimeout(() => window.location.reload(), 1200);
       }
     } catch (e) {
@@ -502,7 +495,7 @@ const ManualOverridePanel = () => {
   };
 
   const handleClear = async (metric: string) => {
-    await fetch(`http://127.0.0.1:8000/manual-override/${metric}`, { method: "DELETE" });
+    await fetch(`${API}/manual-override/${metric}`, { method: "DELETE" });
     window.location.reload();
   };
 
@@ -522,8 +515,6 @@ const ManualOverridePanel = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-x hairline">
-
-        {/* Left — paste input */}
         <div className="p-5">
           <div className="caps-sm text-faint mb-2">
             Paste JSON from Claude · single object or array
@@ -575,14 +566,12 @@ const ManualOverridePanel = () => {
           </div>
         </div>
 
-        {/* Right — active overrides */}
         <div className="p-5">
           <div className="caps-sm text-faint mb-4">Active overrides</div>
           <ActiveOverrides onClear={handleClear} />
         </div>
       </div>
 
-      {/* Footer */}
       <div className="px-5 py-3 hairline-t bg-surface-inset flex items-center justify-between">
         <div className="caps-sm text-faint">
           Overrides persist until cleared · amber dot on card indicates manual data
@@ -599,10 +588,10 @@ const ActiveOverrides = ({ onClear }: { onClear: (metric: string) => void }) => 
   const [overrides, setOverrides] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/manual-override")
-      .then((r) => r.json())
-      .then(setOverrides)
-      .catch(() => {});
+    fetch(`${API}/manual-override`)
+      .then((res) => res.json())
+      .then((json) => setOverrides(json))
+      .catch((err) => console.error(err));
   }, []);
 
   const entries = Object.entries(overrides);
@@ -663,7 +652,6 @@ const ActiveOverrides = ({ onClear }: { onClear: (metric: string) => void }) => 
   );
 };
 
-
 const TradeExecutionPanel = ({
   executions,
   onAdd,
@@ -685,7 +673,6 @@ const TradeExecutionPanel = ({
     market_state:     "",
   });
 
-  // Live calculated fields
   const planned    = parseFloat(form.planned_entry)    || 0;
   const actual     = parseFloat(form.actual_entry)     || 0;
   const drawdownPct = parseFloat(form.max_drawdown_pct) || 0;
@@ -708,7 +695,7 @@ const TradeExecutionPanel = ({
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await fetch("http://127.0.0.1:8000/trade-execution", {
+      const res = await fetch(`${API}/trade-execution`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
@@ -742,7 +729,6 @@ const TradeExecutionPanel = ({
 
   return (
     <div className="bg-surface border hairline">
-      {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 hairline-b">
         <div>
           <div className="caps-sm text-faint">VI</div>
@@ -765,7 +751,6 @@ const TradeExecutionPanel = ({
         </div>
       </div>
 
-      {/* Form */}
       {showForm && (
         <div className="px-5 py-5 hairline-b bg-surface-2">
           <div className="caps-sm text-amber-sand mb-4">New execution entry</div>
@@ -777,162 +762,68 @@ const TradeExecutionPanel = ({
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-5">
-
-            {/* Planned Entry */}
             <div>
               <label className="caps-sm text-faint block mb-1.5">Planned entry price (USD)</label>
-              <input
-                type="number"
-                value={form.planned_entry}
-                onChange={(e) => setForm((s) => ({ ...s, planned_entry: e.target.value }))}
-                placeholder="e.g. 76000"
-                className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-mono-data"
-              />
+              <input type="number" value={form.planned_entry} onChange={(e) => setForm((s) => ({ ...s, planned_entry: e.target.value }))} placeholder="e.g. 76000" className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-mono-data" />
             </div>
-
-            {/* Actual Entry */}
             <div>
               <label className="caps-sm text-faint block mb-1.5">Actual entry / fill price (USD)</label>
-              <input
-                type="number"
-                value={form.actual_entry}
-                onChange={(e) => setForm((s) => ({ ...s, actual_entry: e.target.value }))}
-                placeholder="e.g. 76120"
-                className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-mono-data"
-              />
+              <input type="number" value={form.actual_entry} onChange={(e) => setForm((s) => ({ ...s, actual_entry: e.target.value }))} placeholder="e.g. 76120" className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-mono-data" />
             </div>
-
-            {/* Slippage — calculated */}
             <div>
-              <label className="caps-sm text-faint block mb-1.5">
-                Slippage <span className="text-amber-sand">· calculated</span>
-              </label>
-              <div className={`w-full bg-surface-inset border hairline px-2.5 py-2 text-[12px] font-mono-data ${
-                slippage === null ? "text-faint" :
-                slippage > 0 ? "text-alert-extreme" :
-                slippage < 0 ? "text-neutral-sage" : "text-muted"
-              }`}>
-                {slippage !== null
-                  ? `${slippage > 0 ? "+" : ""}$${slippage.toFixed(2)}`
-                  : "—"
-                }
+              <label className="caps-sm text-faint block mb-1.5">Slippage <span className="text-amber-sand">· calculated</span></label>
+              <div className={`w-full bg-surface-inset border hairline px-2.5 py-2 text-[12px] font-mono-data ${slippage === null ? "text-faint" : slippage > 0 ? "text-alert-extreme" : slippage < 0 ? "text-neutral-sage" : "text-muted"}`}>
+                {slippage !== null ? `${slippage > 0 ? "+" : ""}$${slippage.toFixed(2)}` : "—"}
               </div>
             </div>
-
-            {/* Size */}
             <div>
               <label className="caps-sm text-faint block mb-1.5">Current size (BTC)</label>
-              <input
-                type="number"
-                value={form.size_btc}
-                onChange={(e) => setForm((s) => ({ ...s, size_btc: e.target.value }))}
-                placeholder="e.g. 0.5"
-                className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-mono-data"
-              />
+              <input type="number" value={form.size_btc} onChange={(e) => setForm((s) => ({ ...s, size_btc: e.target.value }))} placeholder="e.g. 0.5" className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-mono-data" />
             </div>
-
-            {/* Max Drawdown % */}
             <div>
               <label className="caps-sm text-faint block mb-1.5">Max drawdown / stop loss (%)</label>
-              <input
-                type="number"
-                value={form.max_drawdown_pct}
-                onChange={(e) => setForm((s) => ({ ...s, max_drawdown_pct: e.target.value }))}
-                placeholder="e.g. 3"
-                className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-mono-data"
-              />
+              <input type="number" value={form.max_drawdown_pct} onChange={(e) => setForm((s) => ({ ...s, max_drawdown_pct: e.target.value }))} placeholder="e.g. 3" className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-mono-data" />
             </div>
-
-            {/* Max Drawdown Price — calculated */}
             <div>
-              <label className="caps-sm text-faint block mb-1.5">
-                Stop price <span className="text-amber-sand">· calculated</span>
-              </label>
+              <label className="caps-sm text-faint block mb-1.5">Stop price <span className="text-amber-sand">· calculated</span></label>
               <div className="w-full bg-surface-inset border hairline px-2.5 py-2 text-[12px] font-mono-data text-alert-extreme">
                 {maxDrawdownPrice !== null ? `$${maxDrawdownPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
               </div>
             </div>
-
-            {/* Current Volume */}
             <div>
               <label className="caps-sm text-faint block mb-1.5">Current volume (BTC)</label>
-              <input
-                type="number"
-                value={form.current_volume}
-                onChange={(e) => setForm((s) => ({ ...s, current_volume: e.target.value }))}
-                placeholder="e.g. 1200"
-                className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-mono-data"
-              />
+              <input type="number" value={form.current_volume} onChange={(e) => setForm((s) => ({ ...s, current_volume: e.target.value }))} placeholder="e.g. 1200" className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-mono-data" />
             </div>
-
-            {/* Market State */}
             <div>
               <label className="caps-sm text-faint block mb-1.5">Market state</label>
               <div className="flex gap-2">
                 {marketStates.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setForm((f) => ({ ...f, market_state: s }))}
-                    className={`caps-sm px-3 py-2 border flex-1 transition-colors ${
-                      form.market_state === s
-                        ? stateColors[s]
-                        : "hairline text-muted hover:text-paper"
-                    }`}
-                  >
-                    {s}
-                  </button>
+                  <button key={s} onClick={() => setForm((f) => ({ ...f, market_state: s }))} className={`caps-sm px-3 py-2 border flex-1 transition-colors ${form.market_state === s ? stateColors[s] : "hairline text-muted hover:text-paper"}`}>{s}</button>
                 ))}
               </div>
             </div>
-
           </div>
 
-          {/* Volume Benchmarks — calculated */}
           {volume > 0 && (
             <div className="hairline-t pt-4 mb-5">
-              <div className="caps-sm text-faint mb-3">
-                Volume benchmarks <span className="text-amber-sand">· calculated · use for TradingView alerts</span>
-              </div>
+              <div className="caps-sm text-faint mb-3">Volume benchmarks <span className="text-amber-sand">· calculated · use for TradingView alerts</span></div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-surface-inset border hairline p-3">
-                  <div className="caps-sm text-faint mb-1">0.5x — Slowdown</div>
-                  <div className="font-mono-data text-paper-2 text-[14px]">{fmt(vol05x, 2)} BTC</div>
-                </div>
-                <div className="bg-surface-inset border hairline p-3">
-                  <div className="caps-sm text-faint mb-1">1.5x — Interest</div>
-                  <div className="font-mono-data text-amber-sand text-[14px]">{fmt(vol15x, 2)} BTC</div>
-                </div>
-                <div className="bg-surface-inset border hairline p-3">
-                  <div className="caps-sm text-faint mb-1">2.0x — Significant</div>
-                  <div className="font-mono-data text-alert-notable text-[14px]">{fmt(vol20x, 2)} BTC</div>
-                </div>
+                <div className="bg-surface-inset border hairline p-3"><div className="caps-sm text-faint mb-1">0.5x — Slowdown</div><div className="font-mono-data text-paper-2 text-[14px]">{fmt(vol05x, 2)} BTC</div></div>
+                <div className="bg-surface-inset border hairline p-3"><div className="caps-sm text-faint mb-1">1.5x — Interest</div><div className="font-mono-data text-amber-sand text-[14px]">{fmt(vol15x, 2)} BTC</div></div>
+                <div className="bg-surface-inset border hairline p-3"><div className="caps-sm text-faint mb-1">2.0x — Significant</div><div className="font-mono-data text-alert-notable text-[14px]">{fmt(vol20x, 2)} BTC</div></div>
               </div>
             </div>
           )}
 
           <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setShowForm(false)}
-              className="caps-sm px-3 py-1.5 border hairline text-muted hover:text-paper transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className={`caps-sm px-3 py-1.5 border transition-colors ${
-                saving
-                  ? "border-faint text-faint cursor-not-allowed"
-                  : "border-amber-sand text-amber-sand hover:bg-amber-sand-10"
-              }`}
-            >
+            <button onClick={() => setShowForm(false)} className="caps-sm px-3 py-1.5 border hairline text-muted hover:text-paper transition-colors">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className={`caps-sm px-3 py-1.5 border transition-colors ${saving ? "border-faint text-faint cursor-not-allowed" : "border-amber-sand text-amber-sand hover:bg-amber-sand-10"}`}>
               {saving ? "Saving…" : "Save execution"}
             </button>
           </div>
         </div>
       )}
 
-      {/* Table header */}
       <div className="grid grid-cols-12 caps-sm text-faint px-5 py-2.5 hairline-b bg-surface-inset">
         <div className="col-span-1">Date</div>
         <div className="col-span-1">State</div>
@@ -951,28 +842,14 @@ const TradeExecutionPanel = ({
         </div>
       ) : (
         executions.map((e, i) => {
-          const stateColor =
-            e.market_state === "Green"  ? "text-neutral-sage" :
-            e.market_state === "Yellow" ? "text-alert-notable" :
-            e.market_state === "Red"    ? "text-alert-extreme" : "text-muted";
-
+          const stateColor = e.market_state === "Green" ? "text-neutral-sage" : e.market_state === "Yellow" ? "text-alert-notable" : e.market_state === "Red" ? "text-alert-extreme" : "text-muted";
           return (
-            <div
-              key={i}
-              className={`grid grid-cols-12 px-5 py-3 text-[12px] font-sans-body items-center ${
-                i < executions.length - 1 ? "hairline-b" : ""
-              } hover:bg-surface-2 transition-colors`}
-            >
+            <div key={i} className={`grid grid-cols-12 px-5 py-3 text-[12px] font-sans-body items-center ${i < executions.length - 1 ? "hairline-b" : ""} hover:bg-surface-2 transition-colors`}>
               <div className="col-span-1 font-mono-data text-paper-2">{e.date}</div>
               <div className={`col-span-1 caps-sm ${stateColor}`}>{e.market_state}</div>
               <div className="col-span-2 font-mono-data text-paper-2">${e.planned_entry?.toLocaleString()}</div>
               <div className="col-span-2 font-mono-data text-paper">${e.actual_entry?.toLocaleString()}</div>
-              <div className={`col-span-1 font-mono-data ${
-                e.slippage > 0 ? "text-alert-extreme" :
-                e.slippage < 0 ? "text-neutral-sage" : "text-muted"
-              }`}>
-                {e.slippage > 0 ? "+" : ""}{e.slippage?.toFixed(2)}
-              </div>
+              <div className={`col-span-1 font-mono-data ${e.slippage > 0 ? "text-alert-extreme" : e.slippage < 0 ? "text-neutral-sage" : "text-muted"}`}>{e.slippage > 0 ? "+" : ""}{e.slippage?.toFixed(2)}</div>
               <div className="col-span-1 font-mono-data text-paper-2">{e.size_btc} BTC</div>
               <div className="col-span-1 font-mono-data text-muted">{e.max_drawdown_pct}%</div>
               <div className="col-span-2 font-mono-data text-alert-extreme">${e.max_drawdown_price?.toLocaleString()}</div>
@@ -982,7 +859,6 @@ const TradeExecutionPanel = ({
         })
       )}
 
-      {/* Footer */}
       <div className="px-5 py-4 hairline-t bg-surface-inset flex items-center justify-between">
         <div className="flex items-center gap-2 text-faint">
           <Activity size={12} />
@@ -1017,7 +893,7 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await fetch("http://127.0.0.1:8000/trade-log", {
+      const res = await fetch(`${API}/trade-log`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(form),
@@ -1025,7 +901,7 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       setShowForm(false);
       setForm({ structure: "", capital: "", read: "", contradiction: "", plan: "", risk: "" });
-      onAdd(); // triggers parent to refetch logs
+      onAdd();
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -1034,13 +910,13 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
   };
 
   const formFields = [
-  { key: "structure" as const,     label: "Market structure at entry",  placeholder: "Range high test, bull flag, breakout retest…" },
-  { key: "capital" as const,       label: "Capital & flow picture",     placeholder: "ETF inflow strong, realized cap rising, OI elevated…" },
-  { key: "read" as const,          label: "My read at the time",        placeholder: "What I believed was happening when I made this decision…" },
-  { key: "contradiction" as const, label: "What I was ignoring",        placeholder: "The signal that argued against my read…" },
-  { key: "plan" as const,          label: "What I did",                 placeholder: "Entered long at $X, sized Y%, stop at Z…" },
-  { key: "risk" as const,          label: "Risk taken",                 placeholder: "Low / Medium / High / Oversized" },
-];
+    { key: "structure" as const,     label: "Market structure at entry",  placeholder: "Range high test, bull flag, breakout retest…" },
+    { key: "capital" as const,       label: "Capital & flow picture",     placeholder: "ETF inflow strong, realized cap rising, OI elevated…" },
+    { key: "read" as const,          label: "My read at the time",        placeholder: "What I believed was happening when I made this decision…" },
+    { key: "contradiction" as const, label: "What I was ignoring",        placeholder: "The signal that argued against my read…" },
+    { key: "plan" as const,          label: "What I did",                 placeholder: "Entered long at $X, sized Y%, stop at Z…" },
+    { key: "risk" as const,          label: "Risk taken",                 placeholder: "Low / Medium / High / Oversized" },
+  ];
 
   return (
     <div className="bg-surface border hairline">
@@ -1053,11 +929,7 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
           <span className="caps-sm text-faint">{logs.length} entries</span>
           <button
             onClick={() => setShowForm(!showForm)}
-            className={`caps-sm px-3 py-1.5 border transition-colors ${
-              showForm
-                ? "border-amber-sand bg-amber-sand-10 text-amber-sand"
-                : "hairline text-muted hover:text-paper hover:border-amber-sand"
-            }`}
+            className={`caps-sm px-3 py-1.5 border transition-colors ${showForm ? "border-amber-sand bg-amber-sand-10 text-amber-sand" : "hairline text-muted hover:text-paper hover:border-amber-sand"}`}
           >
             {showForm ? "Cancel" : "New entry"}
           </button>
@@ -1067,11 +939,9 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
       {showForm && (
         <div className="px-5 py-4 hairline-b bg-surface-2">
           <div className="mb-4">
-  <div className="caps-sm text-amber-sand mb-1">Log a trade decision</div>
-  <p className="font-sans-body text-muted text-[11px]">
-    Record what the market looked like, what you decided, and why. Add result and bias after the trade closes.
-  </p>
-</div>
+            <div className="caps-sm text-amber-sand mb-1">Log a trade decision</div>
+            <p className="font-sans-body text-muted text-[11px]">Record what the market looked like, what you decided, and why. Add result and bias after the trade closes.</p>
+          </div>
           {saveError && (
             <div className="bg-extreme-10 border border-extreme px-3 py-2 mb-3">
               <span className="caps-sm text-alert-extreme">{saveError}</span>
@@ -1081,32 +951,13 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
             {formFields.map((f) => (
               <div key={f.key}>
                 <label className="caps-sm text-faint block mb-1.5">{f.label}</label>
-                <textarea
-                  rows={2}
-                  value={form[f.key]}
-                  onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
-                  placeholder={f.placeholder}
-                  className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-sans-body resize-none"
-                />
+                <textarea rows={2} value={form[f.key]} onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))} placeholder={f.placeholder} className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-sans-body resize-none" />
               </div>
             ))}
           </div>
           <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setShowForm(false)}
-              className="caps-sm px-3 py-1.5 hairline text-muted hover:text-paper border transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className={`caps-sm px-3 py-1.5 border transition-colors ${
-                saving
-                  ? "border-faint text-faint cursor-not-allowed"
-                  : "border-amber-sand text-amber-sand hover:bg-amber-sand-10"
-              }`}
-            >
+            <button onClick={() => setShowForm(false)} className="caps-sm px-3 py-1.5 hairline text-muted hover:text-paper border transition-colors">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className={`caps-sm px-3 py-1.5 border transition-colors ${saving ? "border-faint text-faint cursor-not-allowed" : "border-amber-sand text-amber-sand hover:bg-amber-sand-10"}`}>
               {saving ? "Saving…" : "Log This Trade"}
             </button>
           </div>
@@ -1129,21 +980,13 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
         </div>
       ) : (
         logs.map((log, i) => (
-          <div
-            key={i}
-            className={`grid grid-cols-12 px-5 py-3 text-[12px] font-sans-body items-center ${
-              i < logs.length - 1 ? "hairline-b" : ""
-            } hover:bg-surface-2 transition-colors`}
-          >
+          <div key={i} className={`grid grid-cols-12 px-5 py-3 text-[12px] font-sans-body items-center ${i < logs.length - 1 ? "hairline-b" : ""} hover:bg-surface-2 transition-colors`}>
             <div className="col-span-1 font-mono-data text-paper-2">{log.date}</div>
             <div className="col-span-1 font-mono-data text-faint text-[10px]">{(log as any).btc_price ?? "—"}</div>
             <div className="col-span-2 text-paper">{log.structure}</div>
             <div className="col-span-3 text-paper-2 italic">{log.read}</div>
             <div className="col-span-2 text-paper-2">{log.plan}</div>
-            <div className={`col-span-2 font-mono-data ${
-              log.result?.startsWith("+") ? "text-neutral-sage" :
-              log.result?.startsWith("-") ? "text-alert-extreme" : "text-muted"
-            }`}>{log.result ?? "Open"}</div>
+            <div className={`col-span-2 font-mono-data ${log.result?.startsWith("+") ? "text-neutral-sage" : log.result?.startsWith("-") ? "text-alert-extreme" : "text-muted"}`}>{log.result ?? "Open"}</div>
             <div className="col-span-1 caps-sm text-faint">{log.bias ?? "—"}</div>
           </div>
         ))
@@ -1161,6 +1004,7 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
     </div>
   );
 };
+
 const Header = ({ price, change24h }: { price: string; change24h: string }) => (
   <header className="hairline-b">
     <div className="max-w-[1440px] mx-auto px-8 py-5 flex items-center justify-between">
@@ -1174,14 +1018,14 @@ const Header = ({ price, change24h }: { price: string; change24h: string }) => (
         <div className="text-right">
           <div className="caps-sm text-faint">Spot</div>
           <div className="font-mono-data text-paper text-[15px]">
-  {price} <span className={`text-[12px] ${change24h.startsWith("+") ? "text-neutral-sage" : "text-alert-extreme"}`}>{change24h}</span>
-</div>
+            {price} <span className={`text-[12px] ${change24h.startsWith("+") ? "text-neutral-sage" : "text-alert-extreme"}`}>{change24h}</span>
+          </div>
         </div>
         <div className="text-right hidden sm:block">
           <div className="caps-sm text-faint">Snapshot</div>
           <div className="font-mono-data text-paper-2 text-[12px]">
-  {new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" })}
-</div>
+            {new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" })}
+          </div>
         </div>
         <div className="flex items-center gap-1.5 pl-4 border-l hairline">
           <Circle size={7} fill="#8DA078" stroke="none" className="pulse-dot" />
@@ -1206,112 +1050,99 @@ export default function BTCDecisionDashboard() {
   const [judgment, setJudgment] = useState<JudgmentState>({ read: "", supports: "", contradicts: "", invalidates: "", plan: "", risk: null });
   const [logs, setLogs] = useState<TradeLog[]>(INITIAL_TRADE_LOGS);
   const [now, setNow] = useState(new Date());
-
-  // NEW: state for metrics fetched from the backend
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [price, setPrice] = useState<{price: string; change_24h: string}>({
-  price: "—",
-  change_24h: "—",
-});
-const [summary, setSummary] = useState<{
-  structure: string;
-  extreme_count: number;
-  notable_count: number;
-  active_alerts: Array<{metric: string; alert: string; level: string; current: string}>;
-} | null>(null);
-const [news, setNews] = useState<Array<{
-  title: string;
-  source: string;
-  time: string;
-  tag: string;
-  url: string;
-}>>([]);
-const [causal, setCausal] = useState<{
-  chain: Array<{label: string; state: string; weight: string}>;
-  contradiction: string;
-} | null>(null);
-
-const [executions, setExecutions] = useState<any[]>([]);
+  const [price, setPrice] = useState<{price: string; change_24h: string}>({ price: "—", change_24h: "—" });
+  const [summary, setSummary] = useState<{
+    structure: string;
+    extreme_count: number;
+    notable_count: number;
+    active_alerts: Array<{metric: string; alert: string; level: string; current: string}>;
+  } | null>(null);
+  const [news, setNews] = useState<Array<{ title: string; source: string; time: string; tag: string; url: string }>>([]);
+  const [causal, setCausal] = useState<{ chain: Array<{label: string; state: string; weight: string}>; contradiction: string } | null>(null);
+  const [executions, setExecutions] = useState<any[]>([]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(id);
   }, []);
 
-useEffect(() => {
-const fetchAll = async () => {
-  try {
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-    const metricsRes = await fetch("http://127.0.0.1:8000/metrics");
-    if (!metricsRes.ok) throw new Error(`Backend returned ${metricsRes.status}`);
-    const data = await metricsRes.json();
+        const metricsRes = await fetch(`${API}/metrics`);
+        if (!metricsRes.ok) throw new Error(`Backend returned ${metricsRes.status}`);
+        const data = await metricsRes.json();
 
-    await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 1000));
 
-    const [priceRes, summaryRes] = await Promise.all([
-      fetch("http://127.0.0.1:8000/price"),
-      fetch("http://127.0.0.1:8000/summary"),
-    ]);
+        const [priceRes, summaryRes] = await Promise.all([
+          fetch(`${API}/price`),
+          fetch(`${API}/summary`),
+        ]);
 
-    const newsRes  = await fetch("http://127.0.0.1:8000/news");
-const newsData = await newsRes.json();
-if (newsData.items) setNews(newsData.items);
-const causalRes  = await fetch("http://127.0.0.1:8000/causal");
-const causalData = await causalRes.json();
-setCausal(causalData);
+        const newsRes  = await fetch(`${API}/news`);
+        const newsData = await newsRes.json();
+        if (newsData.items) setNews(newsData.items);
 
-    const priceData   = await priceRes.json();
-    const summaryData = await summaryRes.json();
+        const causalRes  = await fetch(`${API}/causal`);
+        const causalData = await causalRes.json();
+        setCausal(causalData);
 
-    const tradeLogRes  = await fetch("http://127.0.0.1:8000/trade-log");
-    const tradeLogData = await tradeLogRes.json();
-      if (Array.isArray(tradeLogData) && tradeLogData.length > 0) {
-      setLogs(tradeLogData);
+        const priceData   = await priceRes.json();
+        const summaryData = await summaryRes.json();
+
+        const tradeLogRes  = await fetch(`${API}/trade-log`);
+        const tradeLogData = await tradeLogRes.json();
+        if (Array.isArray(tradeLogData) && tradeLogData.length > 0) {
+          setLogs(tradeLogData);
+        }
+
+        const execRes  = await fetch(`${API}/trade-execution`);
+        const execData = await execRes.json();
+        if (Array.isArray(execData)) setExecutions(execData);
+
+        const transformed: Metric[] = Object.entries(data).map(([id, raw]) => {
+          const m = raw as Record<string, unknown>;
+          return {
+            id,
+            name:        m.name as string,
+            category:    m.category as string,
+            current:     m.current as string,
+            currentDir:  m.current_dir as "up" | "down" | "flat",
+            d7:          m.d7 as string,
+            vs30d:       m.vs30d as string,
+            percentile:  m.percentile as number,
+            alert:       m.alert as string,
+            alertLevel:  m.alert_level as "extreme" | "notable" | "neutral" | "none",
+            pattern:     m.pattern as string,
+            spark:       (m.spark as number[]) ?? [],
+            updated:     "just now",
+            _is_override: (m._is_override ?? false) as boolean,
+          };
+        });
+
+        setMetrics(transformed);
+        setPrice(priceData);
+        setSummary(summaryData);
+
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        setMetrics([]);
+      } finally {
+        setLoading(false);
       }
-const execRes  = await fetch("http://127.0.0.1:8000/trade-execution");
-const execData = await execRes.json();
-if (Array.isArray(execData)) setExecutions(execData);
-  const transformed: Metric[] = Object.entries(data).map(([id, raw]) => {
-  const m = raw as Record<string, unknown>;
-  return {
-    id,
-    name:        m.name as string,
-    category:    m.category as string,
-    current:     m.current as string,
-    currentDir:  m.current_dir as "up" | "down" | "flat",
-    d7:          m.d7 as string,
-    vs30d:       m.vs30d as string,
-    percentile:  m.percentile as number,
-    alert:       m.alert as string,
-    alertLevel:  m.alert_level as "extreme" | "notable" | "neutral" | "none",
-    pattern:     m.pattern as string,
-    spark:       (m.spark as number[]) ?? [],
-    updated:     "just now",
-    _is_override: (m._is_override ?? false) as boolean,
-  };
-});
+    };
 
-
-    setMetrics(transformed);
-    setPrice(priceData);
-    setSummary(summaryData);
-
-  } catch (e) {
-    setError(e instanceof Error ? e.message : "Unknown error");
-    setMetrics([]);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  fetchAll();
-  const id = setInterval(fetchAll, 60000);
-  return () => clearInterval(id);
-}, []);
+    fetchAll();
+    const id = setInterval(fetchAll, 60000);
+    return () => clearInterval(id);
+  }, []);
 
   const alertCounts = useMemo(() => {
     const extreme = metrics.filter((m) => m.alertLevel === "extreme").length;
@@ -1332,21 +1163,17 @@ if (Array.isArray(execData)) setExecutions(execData);
             </div>
             <div className="flex items-baseline gap-2">
               <span className="font-display-italic text-paper text-[18px]">
-  {summary?.structure ?? "Calculating…"}
-</span>
+                {summary?.structure ?? "Calculating…"}
+              </span>
             </div>
             <div className="ml-auto flex items-center gap-5">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#C4614A" }} />
-                <span className="caps-sm text-alert-extreme">
-  {summary?.extreme_count ?? alertCounts.extreme} Extreme
-</span>
+                <span className="caps-sm text-alert-extreme">{summary?.extreme_count ?? alertCounts.extreme} Extreme</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#C89A3F" }} />
-                <span className="caps-sm text-alert-notable">
-  {summary?.notable_count ?? alertCounts.notable} Notable
-</span>
+                <span className="caps-sm text-alert-notable">{summary?.notable_count ?? alertCounts.notable} Notable</span>
               </div>
               <div className="flex items-center gap-2 pl-5 border-l hairline">
                 <Clock size={11} className="text-faint" />
@@ -1356,88 +1183,75 @@ if (Array.isArray(execData)) setExecutions(execData);
           </div>
 
           <section>
-  <TradingViewEmbed />
-</section>
-          
+            <TradingViewEmbed />
+          </section>
+
           <section>
-  <SectionLabel
-    numeral="I"
-    title="Market state snapshot"
-    subtitle={
-      loading ? "Fetching…" :
-      error ? "Backend unreachable" :
-      "Benchmark · alert · pattern · no judgment"
-    }
-  />
-  {error && (
-    <div className="border border-extreme bg-extreme-10 p-5 mb-3">
-      <div className="caps-sm text-alert-extreme mb-2 flex items-center gap-1.5">
-        <AlertCircle size={10} /> Backend error
-      </div>
-      <p className="font-sans-body text-paper-2 text-[12px] leading-relaxed">
-        Could not reach <span className="font-mono-data">http://127.0.0.1:8000/metrics</span> — {error}.
-        Check that the FastAPI server is running (<span className="font-mono-data">uvicorn main:app --reload --port 8000</span>).
-      </p>
-    </div>
-  )}
-  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-    {loading && metrics.length === 0 ? (
-      // Loading skeletons — 8 placeholder cards while fetching
-      Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="bg-surface border hairline p-4 h-[260px] fade-in" style={{ animationDelay: `${i * 40}ms` }}>
-          <div className="caps-sm text-faint">Loading…</div>
-        </div>
-      ))
-    ) : (
-      metrics.map((m, i) => <MetricCard key={m.id} metric={m} index={i} />)
-    )}
-  </div>
-</section>
+            <SectionLabel
+              numeral="I"
+              title="Market state snapshot"
+              subtitle={loading ? "Fetching…" : error ? "Backend unreachable" : "Benchmark · alert · pattern · no judgment"}
+            />
+            {error && (
+              <div className="border border-extreme bg-extreme-10 p-5 mb-3">
+                <div className="caps-sm text-alert-extreme mb-2 flex items-center gap-1.5">
+                  <AlertCircle size={10} /> Backend error
+                </div>
+                <p className="font-sans-body text-paper-2 text-[12px] leading-relaxed">
+                  Could not reach <span className="font-mono-data">{API}/metrics</span> — {error}.
+                  Check that the FastAPI server is running (<span className="font-mono-data">uvicorn main:app --reload --port 8000</span>).
+                </p>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+              {loading && metrics.length === 0 ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="bg-surface border hairline p-4 h-[260px] fade-in" style={{ animationDelay: `${i * 40}ms` }}>
+                    <div className="caps-sm text-faint">Loading…</div>
+                  </div>
+                ))
+              ) : (
+                metrics.map((m, i) => <MetricCard key={m.id} metric={m} index={i} />)
+              )}
+            </div>
+          </section>
 
-         <section>
-  <SectionLabel numeral="II–IV" title="Events · causal · judgment" subtitle="Read from left. Decide on the right." />
-  <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-    <div className="lg:col-span-3"><TopEvents items={news} /></div>
-    <div className="lg:col-span-5"><CausalAnalysis data={causal} /></div>
-    <div className="lg:col-span-4"><JudgmentPanel state={judgment} setState={setJudgment} /></div>
-  </div>
-</section>
+          <section>
+            <SectionLabel numeral="II–IV" title="Events · causal · judgment" subtitle="Read from left. Decide on the right." />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+              <div className="lg:col-span-3"><TopEvents items={news} /></div>
+              <div className="lg:col-span-5"><CausalAnalysis data={causal} /></div>
+              <div className="lg:col-span-4"><JudgmentPanel state={judgment} setState={setJudgment} /></div>
+            </div>
+          </section>
 
-<section>
-  <SectionLabel
-    numeral="VI"
-    title="Screenshot override"
-    subtitle="Paste Claude extraction · Exchange Netflow · LTH Supply"
-  />
-  <ManualOverridePanel />
-</section>
+          <section>
+            <SectionLabel numeral="VI" title="Screenshot override" subtitle="Paste Claude extraction · Exchange Netflow · LTH Supply" />
+            <ManualOverridePanel />
+          </section>
 
-<section>
-  <SectionLabel
-    numeral="VII"
-    title="Trade execution"
-    subtitle="Quantitative log · slippage · volume benchmarks · SEM feed"
-  />
-  <TradeExecutionPanel
-    executions={executions}
-    onAdd={() => {
-      fetch("http://127.0.0.1:8000/trade-execution")
-        .then(r => r.json())
-        .then(data => { if (Array.isArray(data)) setExecutions(data); });
-    }}
-  />
-</section>
+          <section>
+            <SectionLabel numeral="VII" title="Trade execution" subtitle="Quantitative log · slippage · volume benchmarks · SEM feed" />
+            <TradeExecutionPanel
+              executions={executions}
+              onAdd={() => {
+                fetch(`${API}/trade-execution`)
+                  .then(r => r.json())
+                  .then(data => { if (Array.isArray(data)) setExecutions(data); });
+              }}
+            />
+          </section>
 
           <section>
             <SectionLabel numeral="VIII" title="Trade Log, Review & notes" subtitle="Trade log · post-trade SEM review" />
-           <TradeLogReview
-  logs={logs}
-  onAdd={() => {
-    fetch("http://127.0.0.1:8000/trade-log")
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setLogs(data); });
-  }}
-/>
+            <TradeLogReview
+              logs={logs}
+              onAdd={() => {
+                fetch(`${API}/trade-log`)
+                  .then(r => r.json())
+                  .then(data => { if (Array.isArray(data)) setLogs(data); });
+              }}
+            />
           </section>
 
           <footer className="pt-8 hairline-t flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-muted">
