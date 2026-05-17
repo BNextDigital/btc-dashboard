@@ -213,7 +213,10 @@ const MetricCard = ({ metric, index }: { metric: Metric; index: number }) => {
   );
 };
 <section>
-  <StablecoinSection />
+ {/* Find the stablecoin data from the metrics array */}
+<StablecoinSection
+  data={metrics.find(m => m.id === "stablecoin_supply") as any ?? null}
+/>
 </section>
 
 const TopEvents = ({ items }: { items: Array<{ title: string; source: string; time: string; tag: string; url: string }> }) => (
