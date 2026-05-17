@@ -145,6 +145,23 @@ type DominanceData = {
   _is_override?: boolean;
 };
 
+type ProxyStock = {
+  ticker:         string;
+  name:           string;
+  price:          string;
+  change_1d:      string;
+  change_7d:      string;
+  change_1d_raw:  number;
+  change_7d_raw:  number;
+  corr_7d:        number;
+  corr_30d:       number;
+  corr_90d:       number;
+  lead_lag_label: string;
+  lead_lag_days:  number;
+  regime:         string;
+  spark:          number[];
+};
+
 const INITIAL_TRADE_LOGS = [
   { date: "Oct 26", structure: "Range high test", read: "Absorption at $67.8k", plan: "Scale in, tight invalidation", result: "Pending", bias: "—" },
   { date: "Oct 21", structure: "Breakout retest", read: "Funding too hot", plan: "Skip", result: "Correct skip", bias: "Patience held" },
@@ -466,6 +483,177 @@ const DominanceCard = ({ data }: { data: DominanceData }) => {
       <div className="flex items-center gap-1 text-faint">
         <Circle size={5} fill={data._is_override ? "#D9A84D" : "#8DA078"} stroke="none" className="pulse-dot" />
         <span className="caps-sm">{data._is_override ? "Manual · screenshot" : "Live · CoinGecko · /global"}</span>
+      </div>
+    </div>
+  );
+};
+
+// ── Correlation helpers ───────────────────────────────────────────────────
+
+const corrColor = (c: number) => {
+  const a = Math.abs(c);
+  if (a >= 0.80) return "#8DA078";
+  if (a >= 0.65) return "#D9A84D";
+  if (a >= 0.45) return "#B8B5AA";
+  return "#55534B";
+};
+
+const regimeBadge = (regime: string) => {
+  switch (regime) {
+    case "Lockstep":     return "border-[rgba(141,160,120,0.35)] bg-[rgba(141,160,120,0.10)] text-[#8DA078]";
+    case "Strong":       return "border-[rgba(217,168,77,0.35)] bg-[rgba(217,168,77,0.10)] text-[#D9A84D]";
+    case "Moderate":     return "border-[#22231F] bg-[#17171A] text-[#B8B5AA]";
+    case "Weak":         return "border-[#22231F] bg-[#17171A] text-[#55534B]";
+    case "Decorrelated": return "border-[rgba(196,97,74,0.35)] bg-[rgba(196,97,74,0.10)] text-[#C4614A]";
+    default:             return "border-[#22231F] bg-[#17171A] text-[#55534B]";
+  }
+};
+
+// ── Correlation bar (7d · 30d · 90d) ─────────────────────────────────────
+
+const CorrBar = ({ label, value }: { label: string; value: number }) => {
+  const pct   = Math.round(Math.abs(value) * 100);
+  const color = corrColor(value);
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex justify-between items-center">
+        <span className="caps-sm text-faint">{label}</span>
+        <span className="font-mono-data text-[11px]" style={{ color }}>
+          {value >= 0 ? "+" : ""}{value.toFixed(2)}
+        </span>
+      </div>
+      <div className="h-[3px] w-full bg-surface-inset relative overflow-hidden rounded-sm">
+        <div className="absolute top-0 left-0 h-full transition-all duration-700"
+          style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+    </div>
+  );
+};
+
+// ── Individual proxy stock card ───────────────────────────────────────────
+
+const ProxyStockCard = ({ stock }: { stock: ProxyStock }) => {
+  const dir1d = stock.change_1d_raw >= 0 ? "up" : "down";
+  const dir7d = stock.change_7d_raw >= 0 ? "up" : "down";
+
+  return (
+    <div className="bg-surface border hairline p-4 flex flex-col gap-3
+                    hover:bg-surface-2 transition-colors duration-300">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-mono-data text-amber-sand text-[16px] font-medium leading-none">
+            {stock.ticker}
+          </div>
+          <div className="caps-sm text-faint mt-1">{stock.name}</div>
+        </div>
+        <span className={`caps-sm px-2 py-[3px] border whitespace-nowrap ${regimeBadge(stock.regime)}`}>
+          {stock.regime}
+        </span>
+      </div>
+
+      {/* Price */}
+      <div>
+        <div className="font-mono-data text-paper text-[20px] leading-none tracking-tight">
+          {stock.price}
+        </div>
+        <div className="flex items-center gap-3 mt-1.5">
+          <span className={`font-mono-data text-[11px] ${dir1d === "up" ? "text-neutral-sage" : "text-alert-extreme"}`}>
+            {stock.change_1d} 1d
+          </span>
+          <span className={`font-mono-data text-[11px] ${dir7d === "up" ? "text-neutral-sage" : "text-alert-extreme"}`}>
+            {stock.change_7d} 7d
+          </span>
+        </div>
+      </div>
+
+      {/* Sparkline */}
+      <Sparkline data={stock.spark} dir={stock.change_7d_raw >= 0 ? "up" : "down"} />
+
+      {/* Correlation bars */}
+      <div className="hairline-t pt-3 flex flex-col gap-2">
+        <CorrBar label="7d"  value={stock.corr_7d}  />
+        <CorrBar label="30d" value={stock.corr_30d} />
+        <CorrBar label="90d" value={stock.corr_90d} />
+      </div>
+
+      {/* Lead / lag */}
+      <div className="hairline-t pt-2 flex items-center justify-between">
+        <span className="caps-sm text-faint">vs BTC</span>
+        <span className="font-sans-body text-paper-2 text-[11px] italic">
+          {stock.lead_lag_label}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ── Correlation matrix ────────────────────────────────────────────────────
+
+const CorrelationMatrix = ({ stocks }: { stocks: ProxyStock[] }) => {
+  const sorted = [...stocks].sort((a, b) => b.corr_30d - a.corr_30d);
+
+  return (
+    <div className="bg-surface border hairline">
+      {/* Header row */}
+      <div className="grid grid-cols-12 caps-sm text-faint px-5 py-2.5 hairline-b bg-surface-inset">
+        <div className="col-span-3">Stock</div>
+        <div className="col-span-2 text-center">7d corr</div>
+        <div className="col-span-2 text-center">30d corr</div>
+        <div className="col-span-2 text-center">90d corr</div>
+        <div className="col-span-2 text-center">vs BTC</div>
+        <div className="col-span-1 text-center">Regime</div>
+      </div>
+
+      {sorted.map((s, i) => (
+        <div key={s.ticker}
+          className={`grid grid-cols-12 px-5 py-3 items-center text-[12px]
+                      ${i < sorted.length - 1 ? "hairline-b" : ""}
+                      hover:bg-surface-2 transition-colors`}>
+          <div className="col-span-3">
+            <span className="font-mono-data text-amber-sand text-[13px]">{s.ticker}</span>
+            <span className="font-sans-body text-faint text-[10px] ml-2">{s.name}</span>
+          </div>
+          <div className="col-span-2 text-center font-mono-data"
+            style={{ color: corrColor(s.corr_7d) }}>
+            {s.corr_7d >= 0 ? "+" : ""}{s.corr_7d.toFixed(2)}
+          </div>
+          <div className="col-span-2 text-center font-mono-data"
+            style={{ color: corrColor(s.corr_30d) }}>
+            {s.corr_30d >= 0 ? "+" : ""}{s.corr_30d.toFixed(2)}
+          </div>
+          <div className="col-span-2 text-center font-mono-data"
+            style={{ color: corrColor(s.corr_90d) }}>
+            {s.corr_90d >= 0 ? "+" : ""}{s.corr_90d.toFixed(2)}
+          </div>
+          <div className="col-span-2 text-center font-sans-body text-paper-2 italic text-[11px]">
+            {s.lead_lag_label}
+          </div>
+          <div className="col-span-1 text-center">
+            <span className={`caps-sm px-1.5 py-[2px] border ${regimeBadge(s.regime)}`}>
+              {s.regime[0]}
+            </span>
+          </div>
+        </div>
+      ))}
+
+      <div className="px-5 py-3 hairline-t bg-surface-inset flex items-center justify-between">
+        <div className="caps-sm text-faint">
+          Sorted by 30d correlation · cross-correlation window ±5 trading days
+        </div>
+        <div className="flex items-center gap-4">
+          {[
+            { label: "Lockstep",     color: "#8DA078" },
+            { label: "Strong",       color: "#D9A84D" },
+            { label: "Moderate",     color: "#B8B5AA" },
+            { label: "Decorrelated", color: "#C4614A" },
+          ].map(r => (
+            <div key={r.label} className="flex items-center gap-1.5">
+              <div className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: r.color }} />
+              <span className="caps-sm text-faint">{r.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -924,6 +1112,7 @@ export default function BTCDecisionDashboard() {
   const [news, setNews]           = useState<Array<{ title: string; source: string; time: string; tag: string; url: string }>>([]);
   const [causal, setCausal]       = useState<{ chain: Array<{label: string; state: string; weight: string}>; contradiction: string } | null>(null);
   const [executions, setExecutions] = useState<any[]>([]);
+  const [proxyStocks, setProxyStocks] = useState<ProxyStock[]>([]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
@@ -969,6 +1158,16 @@ export default function BTCDecisionDashboard() {
         if (data["btc_dominance"]) {
           setDominanceData(data["btc_dominance"] as DominanceData);
         }
+
+        // Crypto proxy stocks — separate endpoint, 5-min cache on backend
+        fetch(`${API}/crypto-proxies`)
+  .then(r => r.json())
+  .then(d => {
+    if (d.crypto_proxies) {
+      setProxyStocks(Object.values(d.crypto_proxies) as ProxyStock[]);
+    }
+  })
+  .catch(err => console.error("[proxy stocks]", err));
 
         const transformed: Metric[] = Object.entries(data)
           .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance") // rendered separately below
@@ -1121,10 +1320,31 @@ export default function BTCDecisionDashboard() {
     </div>
   </section>
 )}
+          {/* Section XII — Crypto Proxy Stocks */}
+{proxyStocks.length > 0 && (
+  <section>
+    <SectionLabel
+      numeral="IV"
+      title="Crypto Proxy Stocks"
+      subtitle="S&P 500 crypto-exposed · BTC correlation · lead/lag · yFinance"
+    />
+
+    {/* 5 stock cards */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-3">
+      {proxyStocks
+        .sort((a, b) => b.corr_30d - a.corr_30d)
+        .map(s => <ProxyStockCard key={s.ticker} stock={s} />)
+      }
+    </div>
+
+    {/* Correlation matrix */}
+    <CorrelationMatrix stocks={proxyStocks} />
+  </section>
+)}
 
           {/* Section II–IV — Events · causal · judgment */}
           <section>
-            <SectionLabel numeral="IV–VI" title="Events · causal · judgment" subtitle="Read from left. Decide on the right." />
+            <SectionLabel numeral="V–VII" title="Events · causal · judgment" subtitle="Read from left. Decide on the right." />
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
               <div className="lg:col-span-3"><TopEvents items={news} /></div>
               <div className="lg:col-span-5"><CausalAnalysis data={causal} /></div>
@@ -1134,19 +1354,19 @@ export default function BTCDecisionDashboard() {
 
           {/* Section VI — Screenshot override */}
           <section>
-            <SectionLabel numeral="VII" title="Screenshot override" subtitle="Paste Claude extraction · Exchange Netflow · LTH Supply" />
+            <SectionLabel numeral="VIII" title="Screenshot override" subtitle="Paste Claude extraction · Exchange Netflow · LTH Supply" />
             <ManualOverridePanel />
           </section>
 
           {/* Section VII — Trade execution */}
           <section>
-            <SectionLabel numeral="VIII" title="Trade execution" subtitle="Quantitative log · slippage · volume benchmarks · SEM feed" />
+            <SectionLabel numeral="IX" title="Trade execution" subtitle="Quantitative log · slippage · volume benchmarks · SEM feed" />
             <TradeExecutionPanel executions={executions} onAdd={() => { fetch(`${API}/trade-execution`).then(r => r.json()).then(data => { if (Array.isArray(data)) setExecutions(data); }); }} />
           </section>
 
           {/* Section VIII — Trade log */}
           <section>
-            <SectionLabel numeral="IX" title="Trade Log, Review & notes" subtitle="Trade log · post-trade SEM review" />
+            <SectionLabel numeral="X" title="Trade Log, Review & notes" subtitle="Trade log · post-trade SEM review" />
             <TradeLogReview logs={logs} onAdd={() => { fetch(`${API}/trade-log`).then(r => r.json()).then(data => { if (Array.isArray(data)) setLogs(data); }); }} />
           </section>
 
