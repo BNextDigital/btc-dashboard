@@ -13,6 +13,7 @@ import {
   Minus,
 } from "lucide-react";
 import TradingViewEmbed from "./components/TradingViewEmbed";
+import TradingViewCME from "./components/TradingViewCME";
 
 // ---------------------------------------------------------------------------
 // BTC Decision Dashboard
@@ -1182,9 +1183,28 @@ export default function BTCDecisionDashboard() {
             </div>
           </div>
 
-          <section>
-            <TradingViewEmbed />
-          </section>
+          {/* Existing spot chart */}
+<section>
+  <TradingViewEmbed />
+</section>
+
+{/* CME futures chart */}
+<section>
+  <div className="flex items-end justify-between mb-3 border-b border-[#22231F] pb-3">
+    <div className="flex items-baseline gap-4">
+      <span className="font-['Instrument_Serif'] italic text-[#D9A84D] text-[22px] leading-none">
+        CME
+      </span>
+      <h2 className="font-['Instrument_Serif'] text-[#E8E4D9] text-[22px] leading-none">
+        Bitcoin Futures — Front Month
+      </h2>
+    </div>
+    <span className="text-[9px] tracking-[0.22em] uppercase text-[#55534B]">
+      CME:BTC1! · continuous contract · daily
+    </span>
+  </div>
+  <TradingViewCME />
+</section>
 
           <section>
             <SectionLabel
