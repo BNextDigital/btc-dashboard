@@ -235,31 +235,8 @@ const StablecoinCard = ({ data }: { data: StablecoinData }) => {
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
-export default function StablecoinSection() {
-  const [data, setData]       = useState<StablecoinData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        const res  = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/metrics`);
-        const json = await res.json();
-        const raw  = json["stablecoin_supply"];
-        if (!raw) throw new Error("stablecoin_supply not in /metrics response");
-        setData(raw as StablecoinData);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "fetch error");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-    const id = setInterval(load, 60_000);
-    return () => clearInterval(id);
-  }, []);
+export default function StablecoinSection({ data }: { data: StablecoinData | null }) {
+  if (!data) return null;
 
   return (
     <section>
@@ -277,64 +254,46 @@ export default function StablecoinSection() {
         </span>
       </div>
 
-      {loading && (
-        <div className="bg-[#131315] border border-[#22231F] p-4 h-[320px]">
-          <div className="text-[9px] tracking-[0.22em] uppercase text-[#55534B]">Loading…</div>
-        </div>
-      )}
-
-      {error && (
-        <div className="border border-[rgba(196,97,74,0.35)] bg-[rgba(196,97,74,0.10)] p-4
-                        text-[#C4614A] text-[12px] font-mono">
-          {error}
-        </div>
-      )}
-
-      {data && !loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          <StablecoinCard data={data} />
-
-          {/* Context panel */}
-          <div className="md:col-span-1 xl:col-span-2 bg-[#131315] border border-[#22231F] p-5
-                          flex flex-col justify-between">
-            <div>
-              <div className="text-[9px] tracking-[0.22em] uppercase text-[#55534B] mb-3">
-                What this measures
-              </div>
-              <p className="text-[#B8B5AA] text-[13px] leading-relaxed mb-4">
-                <span className="text-[#E8E4D9] font-medium">Stablecoin supply</span> tracks
-                the total circulating supply of USDT and USDC — the two dominant dollar-pegged
-                stablecoins. Combined, they represent the primary pool of dry powder available
-                to deploy into crypto markets.
-              </p>
-              <p className="text-[#8A8780] text-[12px] leading-relaxed">
-                Rising supply means new capital is being minted and staged — historically a
-                bullish liquidity signal. Falling supply means capital is either deploying into
-                risk assets (bullish deployment) or exiting crypto entirely (bearish outflow).
-                The direction matters as much as the magnitude.
-              </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <StablecoinCard data={data} />
+        <div className="md:col-span-1 xl:col-span-2 bg-[#131315] border border-[#22231F] p-5
+                        flex flex-col justify-between">
+          <div>
+            <div className="text-[9px] tracking-[0.22em] uppercase text-[#55534B] mb-3">
+              What this measures
             </div>
-
-            <div className="border-t border-[#22231F] pt-4 mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "7d expansion",   value: "> +5%",   color: "#C89A3F", note: "Notable" },
-                { label: "7d expansion",   value: "> +10%",  color: "#C4614A", note: "Extreme" },
-                { label: "7d contraction", value: "< -5%",   color: "#C89A3F", note: "Notable" },
-                { label: "7d contraction", value: "< -10%",  color: "#C4614A", note: "Extreme" },
-              ].map((r, i) => (
-                <div key={i}>
-                  <div className="text-[9px] tracking-[0.22em] uppercase text-[#55534B] mb-1">
-                    {r.note} · {r.label}
-                  </div>
-                  <div className="font-mono text-[14px] font-medium" style={{ color: r.color }}>
-                    {r.value}
-                  </div>
+            <p className="text-[#B8B5AA] text-[13px] leading-relaxed mb-4">
+              <span className="text-[#E8E4D9] font-medium">Stablecoin supply</span> tracks
+              the total circulating supply of USDT and USDC — the two dominant dollar-pegged
+              stablecoins. Combined, they represent the primary pool of dry powder available
+              to deploy into crypto markets.
+            </p>
+            <p className="text-[#8A8780] text-[12px] leading-relaxed">
+              Rising supply means new capital is being minted and staged — historically a
+              bullish liquidity signal. Falling supply means capital is either deploying into
+              risk assets (bullish deployment) or exiting crypto entirely (bearish outflow).
+              The direction matters as much as the magnitude.
+            </p>
+          </div>
+          <div className="border-t border-[#22231F] pt-4 mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: "7d expansion",   value: "> +5%",  color: "#C89A3F", note: "Notable" },
+              { label: "7d expansion",   value: "> +10%", color: "#C4614A", note: "Extreme" },
+              { label: "7d contraction", value: "< -5%",  color: "#C89A3F", note: "Notable" },
+              { label: "7d contraction", value: "< -10%", color: "#C4614A", note: "Extreme" },
+            ].map((r, i) => (
+              <div key={i}>
+                <div className="text-[9px] tracking-[0.22em] uppercase text-[#55534B] mb-1">
+                  {r.note} · {r.label}
                 </div>
-              ))}
-            </div>
+                <div className="font-mono text-[14px] font-medium" style={{ color: r.color }}>
+                  {r.value}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      )}
+      </div>
     </section>
   );
 }
