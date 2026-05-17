@@ -869,7 +869,7 @@ export default function BTCDecisionDashboard() {
           {/* Section X — Stablecoin Supply */}
           {stablecoinData && (
             <section>
-              <SectionLabel numeral="X" title="Stablecoin Supply" subtitle="USDT + USDC · liquidity proxy · CoinGecko" />
+              <SectionLabel numeral="X" title="Stablecoin Supply (Market Cap)" subtitle="USDT + USDC · liquidity proxy · CoinGecko" />
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 <StablecoinCard data={stablecoinData} />
                 <div className="md:col-span-1 xl:col-span-2 bg-surface border hairline p-5 flex flex-col justify-between">
