@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import TradingViewEmbed from "./components/TradingViewEmbed";
 import TradingViewCME from "./components/TradingViewCME";
+import StablecoinSection from "./components/StablecoinCard";
 
 // ---------------------------------------------------------------------------
 // BTC Decision Dashboard
@@ -211,6 +212,9 @@ const MetricCard = ({ metric, index }: { metric: Metric; index: number }) => {
     </div>
   );
 };
+<section>
+  <StablecoinSection />
+</section>
 
 const TopEvents = ({ items }: { items: Array<{ title: string; source: string; time: string; tag: string; url: string }> }) => (
   <div className="bg-surface border hairline p-5 flex flex-col h-full">
