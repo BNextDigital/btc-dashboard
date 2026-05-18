@@ -1190,10 +1190,10 @@ export default function BTCDecisionDashboard() {
 
 useEffect(() => {
   if (!selectedDate) {
-    setHistoricalMetrics(null);
-    setHistoricalStablecoin(null);
-    setHistoricalDominance(null);
-    setHistoricalError(null);
+    setHistoricalMetrics(prev => prev !== null ? null : prev);
+    setHistoricalStablecoin(prev => prev !== null ? null : prev);
+    setHistoricalDominance(prev => prev !== null ? null : prev);
+    setHistoricalError(prev => prev !== null ? null : prev);
     return;
   }
 
