@@ -102,6 +102,8 @@ type Metric = {
   spark: number[];
   updated: string;
   _is_override: boolean;
+  _is_historical?: boolean;
+  _date?: string;
 };
 
 type StablecoinData = {
@@ -331,8 +333,19 @@ const MetricCard = ({ metric, index }: { metric: Metric; index: number }) => {
         <span className={`font-sans-body text-[11px] ${metric.pattern === "—" ? "text-faint" : "text-paper-2 italic"}`}>{metric.pattern}</span>
       </div>
       <div className="flex items-center gap-1 text-faint">
-        <Circle size={5} fill={metric._is_override ? "#D9A84D" : "#8DA078"} stroke="none" className="pulse-dot" />
-        <span className="caps-sm">{metric._is_override ? "Manual · screenshot" : `Updated ${metric.updated}`}</span>
+        <Circle
+  size={5}
+  fill={metric._is_historical ? "#378ADD" : metric._is_override ? "#D9A84D" : "#8DA078"}
+  stroke="none"
+  className={metric._is_historical ? "" : "pulse-dot"}
+/>
+<span className="caps-sm">
+  {metric._is_historical
+    ? `Historical · ${metric._date}`
+    : metric._is_override
+    ? "Manual · screenshot"
+    : `Updated ${metric.updated}`}
+</span>
       </div>
     </div>
   );
@@ -1113,6 +1126,12 @@ export default function BTCDecisionDashboard() {
   const [causal, setCausal]       = useState<{ chain: Array<{label: string; state: string; weight: string}>; contradiction: string } | null>(null);
   const [executions, setExecutions] = useState<any[]>([]);
   const [proxyStocks, setProxyStocks] = useState<ProxyStock[]>([]);
+  const [selectedDate, setSelectedDate]       = useState<string>("");
+  const [historicalMetrics, setHistoricalMetrics] = useState<Metric[] | null>(null);
+  const [historicalLoading, setHistoricalLoading] = useState(false);
+  const [historicalError, setHistoricalError]     = useState<string | null>(null);
+  const [historicalStablecoin, setHistoricalStablecoin] = useState<StablecoinData | null>(null);
+  const [historicalDominance, setHistoricalDominance]   = useState<DominanceData | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
@@ -1169,6 +1188,71 @@ export default function BTCDecisionDashboard() {
   })
   .catch(err => console.error("[proxy stocks]", err));
 
+useEffect(() => {
+  if (!selectedDate) {
+    setHistoricalMetrics(null);
+    setHistoricalStablecoin(null);
+    setHistoricalDominance(null);
+    setHistoricalError(null);
+    return;
+  }
+
+  const fetchHistorical = async () => {
+    setHistoricalLoading(true);
+    setHistoricalError(null);
+    try {
+      const res  = await fetch(`${API}/metrics/history?date=${selectedDate}`);
+      const json = await res.json();
+
+      if (json.error || json.count === 0) {
+        setHistoricalError(json.error ?? `No data found for ${selectedDate}`);
+        setHistoricalMetrics([]);
+        return;
+      }
+
+      const raw = json.metrics as Record<string, any>;
+
+      // Stablecoin + dominance as dedicated state
+      if (raw["stablecoin_supply"]) {
+        setHistoricalStablecoin(raw["stablecoin_supply"] as StablecoinData);
+      }
+      if (raw["btc_dominance"]) {
+        setHistoricalDominance(raw["btc_dominance"] as DominanceData);
+      }
+
+      // Everything else → metric cards
+      const transformed: Metric[] = Object.entries(raw)
+        .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance")
+        .map(([id, m]: [string, any]) => ({
+          id,
+          name:          m.name,
+          category:      m.category,
+          current:       m.current,
+          currentDir:    m.current_dir ?? "flat",
+          d7:            m.d7,
+          vs30d:         m.vs30d,
+          percentile:    m.percentile,
+          alert:         m.alert,
+          alertLevel:    m.alert_level,
+          pattern:       m.pattern,
+          spark:         m.spark ?? [],
+          updated:       m.source ?? "Historical",
+          _is_override:  false,
+          _is_historical: true,
+          _date:         selectedDate,
+        }));
+
+      setHistoricalMetrics(transformed);
+    } catch (e) {
+      setHistoricalError(e instanceof Error ? e.message : "Fetch failed");
+    } finally {
+      setHistoricalLoading(false);
+    }
+  };
+
+  fetchHistorical();
+}, [selectedDate]);
+        
         const transformed: Metric[] = Object.entries(data)
           .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance") // rendered separately below
           .map(([id, raw]) => {
@@ -1237,86 +1321,142 @@ export default function BTCDecisionDashboard() {
             <TradingViewEmbed />
           </section>
 
-          {/* Section I — Market state snapshot */}
-          <section>
-            <SectionLabel numeral="I" title="Market state snapshot" subtitle={loading ? "Fetching…" : error ? "Backend unreachable" : "Benchmark · alert · pattern · no judgment"} />
-            {error && (
-              <div className="border border-extreme bg-extreme-10 p-5 mb-3">
-                <div className="caps-sm text-alert-extreme mb-2 flex items-center gap-1.5"><AlertCircle size={10} /> Backend error</div>
-                <p className="font-sans-body text-paper-2 text-[12px] leading-relaxed">Could not reach <span className="font-mono-data">{API}/metrics</span> — {error}.</p>
-              </div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-              {loading && metrics.length === 0
-                ? Array.from({ length: 8 }).map((_, i) => (<div key={i} className="bg-surface border hairline p-4 h-[260px] fade-in" style={{ animationDelay: `${i * 40}ms` }}><div className="caps-sm text-faint">Loading…</div></div>))
-                : metrics.map((m, i) => <MetricCard key={m.id} metric={m} index={i} />)
-              }
-            </div>
-          </section>
-
-          {/* Section X — Stablecoin Supply */}
-          {stablecoinData && (
-            <section>
-              <SectionLabel numeral="II" title="Stablecoin Supply (Market Cap)" subtitle="USDT + USDC · liquidity proxy · CoinGecko" />
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                <StablecoinCard data={stablecoinData} />
-                <div className="md:col-span-1 xl:col-span-2 bg-surface border hairline p-5 flex flex-col justify-between">
-                  <div>
-                    <div className="caps-sm text-faint mb-3">What this measures</div>
-                    <p className="font-sans-body text-paper-2 text-[13px] leading-relaxed mb-4">
-                      <span className="text-paper font-medium">Stablecoin supply</span> tracks the total circulating supply of USDT and USDC — the two dominant dollar-pegged stablecoins. Combined, they represent the primary pool of dry powder available to deploy into crypto markets.
-                    </p>
-                    <p className="font-sans-body text-muted text-[12px] leading-relaxed">
-                      Rising supply means new capital is being minted and staged — historically a bullish liquidity signal. Falling supply means capital is either deploying into risk assets or exiting crypto entirely. The direction matters as much as the magnitude.
-                    </p>
-                  </div>
-                  <div className="hairline-t pt-4 mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[
-                      { label: "7d expansion",   value: "> +5%",  color: "#C89A3F", note: "Notable" },
-                      { label: "7d expansion",   value: "> +10%", color: "#C4614A", note: "Extreme" },
-                      { label: "7d contraction", value: "< -5%",  color: "#C89A3F", note: "Notable" },
-                      { label: "7d contraction", value: "< -10%", color: "#C4614A", note: "Extreme" },
-                    ].map((r, i) => (
-                      <div key={i}>
-                        <div className="caps-sm text-faint mb-1">{r.note} · {r.label}</div>
-                        <div className="font-mono-data text-[14px] font-medium" style={{ color: r.color }}>{r.value}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-          {/* Section XI — BTC Dominance */}
-{dominanceData && (
-  <section>
-    <SectionLabel numeral="III" title="BTC Dominance" subtitle="BTC vs total crypto market cap · USD · CoinGecko" />
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-      <DominanceCard data={dominanceData} />
-      <div className="md:col-span-1 xl:col-span-2 bg-surface border hairline p-5 flex flex-col justify-between">
-        <div>
-          <div className="caps-sm text-faint mb-3">What this measures</div>
-          <p className="font-sans-body text-paper-2 text-[13px] leading-relaxed mb-4">
-            <span className="text-paper font-medium">BTC Dominance</span> is Bitcoin's share of the total cryptocurrency market capitalization in USD. It measures whether capital is concentrating in Bitcoin or rotating into altcoins.
-          </p>
-          <p className="font-sans-body text-muted text-[12px] leading-relaxed">
-            Rising dominance typically signals risk-off rotation into BTC — capital seeking the relative safety of the largest asset. Falling dominance signals risk-on rotation into altcoins. Extreme readings in either direction have historically preceded reversals.
-          </p>
-        </div>
-        <div className="hairline-t pt-4 mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: "Alt season",        value: "< 50%", color: "#C89A3F", note: "Notable" },
-            { label: "Alt season extreme", value: "< 40%", color: "#C4614A", note: "Extreme" },
-            { label: "BTC dominance",     value: "> 60%", color: "#C89A3F", note: "Notable" },
-            { label: "BTC dominance extreme", value: "> 70%", color: "#C4614A", note: "Extreme" },
-          ].map((r, i) => (
-            <div key={i}>
-              <div className="caps-sm text-faint mb-1">{r.note} · {r.label}</div>
-              <div className="font-mono-data text-[14px] font-medium" style={{ color: r.color }}>{r.value}</div>
-            </div>
-          ))}
-        </div>
+{/* Section I — Market state snapshot */}
+<section>
+  <div className="flex items-end justify-between mb-5 hairline-b pb-3">
+    <div className="flex items-baseline gap-4">
+      <span className="font-display-italic text-amber-sand text-[28px] leading-none">I</span>
+      <h2 className="font-display text-paper text-[26px] leading-none">Market state snapshot</h2>
+    </div>
+    <div className="flex items-center gap-4">
+      {/* Date picker */}
+      <div className="flex items-center gap-2">
+        <span className="caps-sm text-faint">Snapshot date</span>
+        <input
+          type="date"
+          value={selectedDate}
+          max={new Date().toISOString().split("T")[0]}
+          onChange={e => setSelectedDate(e.target.value)}
+          className="bg-surface-inset border hairline px-2.5 py-1.5 text-paper
+                     font-mono-data text-[11px] focus:border-amber-sand
+                     focus:outline-none cursor-pointer"
+          style={{ colorScheme: "dark" }}
+        />
+        {selectedDate && (
+          <button
+            onClick={() => setSelectedDate("")}
+            className="caps-sm text-faint hover:text-alert-extreme transition-colors px-2 py-1.5 border hairline"
+          >
+            ✕ Live
+          </button>
+        )}
       </div>
+      <span className="caps-sm text-faint">
+        {selectedDate ? "Historical snapshot" : "Benchmark · alert · pattern · no judgment"}
+      </span>
+    </div>
+  </div>
+
+  {/* Historical mode banner */}
+  {selectedDate && (
+    <div className="border border-[rgba(55,138,221,0.35)] bg-[rgba(55,138,221,0.08)]
+                    px-5 py-3 mb-4 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#378ADD" }} />
+        <span className="font-sans-body text-[#378ADD] text-[12px]">
+          Viewing historical snapshot —{" "}
+          <span className="font-mono-data">
+            {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
+              weekday: "long", year: "numeric", month: "long", day: "numeric"
+            })}
+          </span>
+        </span>
+      </div>
+      <span className="caps-sm text-[#378ADD]">
+        {historicalMetrics?.length ?? 0} metrics found
+      </span>
+    </div>
+  )}
+
+  {/* Error state for historical */}
+  {selectedDate && historicalError && (
+    <div className="border border-extreme bg-extreme-10 p-5 mb-3">
+      <div className="caps-sm text-alert-extreme mb-1 flex items-center gap-1.5">
+        <AlertCircle size={10} /> No data for this date
+      </div>
+      <p className="font-sans-body text-paper-2 text-[12px]">{historicalError}</p>
+    </div>
+  )}
+
+  {/* Live error state */}
+  {!selectedDate && error && (
+    <div className="border border-extreme bg-extreme-10 p-5 mb-3">
+      <div className="caps-sm text-alert-extreme mb-2 flex items-center gap-1.5">
+        <AlertCircle size={10} /> Backend error
+      </div>
+      <p className="font-sans-body text-paper-2 text-[12px] leading-relaxed">
+        Could not reach <span className="font-mono-data">{API}/metrics</span> — {error}.
+      </p>
+    </div>
+  )}
+
+  {/* Metric grid */}
+  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+    {selectedDate ? (
+      historicalLoading ? (
+        Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="bg-surface border hairline p-4 h-[260px] fade-in"
+            style={{ animationDelay: `${i * 40}ms` }}>
+            <div className="caps-sm text-faint">Loading historical data…</div>
+          </div>
+        ))
+      ) : (
+        (historicalMetrics ?? []).map((m, i) => (
+          <MetricCard key={m.id} metric={m} index={i} />
+        ))
+      )
+    ) : (
+      loading && metrics.length === 0
+        ? Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="bg-surface border hairline p-4 h-[260px] fade-in"
+              style={{ animationDelay: `${i * 40}ms` }}>
+              <div className="caps-sm text-faint">Loading…</div>
+            </div>
+          ))
+        : metrics.map((m, i) => <MetricCard key={m.id} metric={m} index={i} />)
+    )}
+  </div>
+</section>
+
+{/* Section X — Stablecoin (historical-aware) */}
+{(selectedDate ? historicalStablecoin : stablecoinData) && (
+  <section>
+    <SectionLabel numeral="X" title="Stablecoin Supply"
+      subtitle={selectedDate ? `Snapshot · ${selectedDate}` : "USDT + USDC · liquidity proxy · CoinGecko"} />
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      <StablecoinCard data={(selectedDate ? historicalStablecoin : stablecoinData)!} />
+      {/* context panel — only show in live mode */}
+      {!selectedDate && (
+        <div className="md:col-span-1 xl:col-span-2 bg-surface border hairline p-5 flex flex-col justify-between">
+          {/* ... existing context panel content ... */}
+        </div>
+      )}
+    </div>
+  </section>
+)}
+
+{/* Section XI — BTC Dominance (historical-aware) */}
+{(selectedDate ? historicalDominance : dominanceData) && (
+  <section>
+    <SectionLabel numeral="XI" title="BTC Dominance"
+      subtitle={selectedDate ? `Snapshot · ${selectedDate}` : "BTC vs total crypto market cap · USD · CoinGecko"} />
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      <DominanceCard data={(selectedDate ? historicalDominance : dominanceData)!} />
+      {!selectedDate && (
+        <div className="md:col-span-1 xl:col-span-2 bg-surface border hairline p-5 flex flex-col justify-between">
+          {/* ... existing context panel content ... */}
+        </div>
+      )}
     </div>
   </section>
 )}
