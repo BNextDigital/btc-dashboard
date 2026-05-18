@@ -695,7 +695,7 @@ export default function BTCDecisionDashboard() {
         const metricsRes = await fetch(`${API}/metrics`);
         if (!metricsRes.ok) throw new Error(`Backend returned ${metricsRes.status}`);
         const data = await metricsRes.json();
-        await new Promise(r => setTimeout(r, 1000));
+        //await new Promise(r => setTimeout(r, 1000));
         const [priceRes, summaryRes] = await Promise.all([fetch(`${API}/price`), fetch(`${API}/summary`)]);
         const newsRes = await fetch(`${API}/news`); const newsData = await newsRes.json(); if (newsData.items) setNews(newsData.items);
         const causalRes = await fetch(`${API}/causal`); const causalData = await causalRes.json(); setCausal(causalData);
