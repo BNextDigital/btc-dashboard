@@ -55,6 +55,7 @@ const FONT_LINK = `
 `;
 
 const API = process.env.NEXT_PUBLIC_API_URL;
+const METRICS_CACHE_KEY = "btc_metrics_v1";
 
 type Metric = {
   id: string; name: string; category: string; current: string;
@@ -673,6 +674,13 @@ export default function BTCDecisionDashboard() {
   const [causal, setCausal]     = useState<{ chain: Array<{ label: string; state: string; weight: string }>; contradiction: string } | null>(null);
   const [executions, setExecutions] = useState<any[]>([]);
   const [proxyStocks, setProxyStocks] = useState<ProxyStock[]>([]);
+  const [fromCache, setFromCache] = useState(false);
+
+// In the mount useEffect, after setLoading(false):
+
+
+// In fetchAll, after the cache write, add:
+
 
   // ── Date picker state ──────────────────────────────────────────────────
   const [selectedDate, setSelectedDate]             = useState<string>("");
@@ -687,6 +695,25 @@ export default function BTCDecisionDashboard() {
     return () => clearInterval(id);
   }, []);
 
+  // Render cached data immediately on mount — no loading skeletons
+useEffect(() => {
+  try {
+    const raw = localStorage.getItem(METRICS_CACHE_KEY);
+    if (!raw) return;
+    const cached = JSON.parse(raw);
+    if (cached.metrics)    setMetrics(cached.metrics);
+    if (cached.stablecoin) setStablecoinData(cached.stablecoin);
+    if (cached.dominance)  setDominanceData(cached.dominance);
+    if (cached.price)      setPrice(cached.price);
+    if (cached.summary)    setSummary(cached.summary);
+    if (cached.news)       setNews(cached.news);
+    setLoading(false); // skip skeletons — show cached cards immediately
+    setFromCache(true);
+  } catch (e) {
+    // ignore — cache miss or parse error, fetchAll will populate normally
+  }
+}, []); // runs once on mount only
+ 
   // ── Main data fetch ────────────────────────────────────────────────────
   useEffect(() => {
     const fetchAll = async () => {
@@ -709,7 +736,24 @@ export default function BTCDecisionDashboard() {
         const transformed: Metric[] = Object.entries(data)
           .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance")
           .map(([id, raw]) => { const m = raw as Record<string, unknown>; return { id, name: m.name as string, category: m.category as string, current: m.current as string, currentDir: m.current_dir as "up" | "down" | "flat", d7: m.d7 as string, vs30d: m.vs30d as string, percentile: m.percentile as number, alert: m.alert as string, alertLevel: m.alert_level as "extreme" | "notable" | "neutral" | "none", pattern: m.pattern as string, spark: (m.spark as number[]) ?? [], updated: "just now", _is_override: (m._is_override ?? false) as boolean }; });
-        setMetrics(transformed); setPrice(priceData); setSummary(summaryData);
+        // Persist to localStorage for instant render on next load
+try {
+  localStorage.setItem(METRICS_CACHE_KEY, JSON.stringify({
+    metrics:    transformed,
+    stablecoin: data["stablecoin_supply"] ?? null,
+    dominance:  data["btc_dominance"]     ?? null,
+    price:      priceData,
+    summary:    summaryData,
+    news:       newsData.items ?? [],
+    ts:         Date.now(),
+  }));
+} catch (e) {
+  // ignore — storage full or disabled
+}
+setFromCache(false);
+setMetrics(transformed);
+setPrice(priceData);
+setSummary(summaryData);
       } catch (e) { setError(e instanceof Error ? e.message : "Unknown error"); setMetrics([]); }
       finally { setLoading(false); }
     };
@@ -787,7 +831,7 @@ export default function BTCDecisionDashboard() {
                   <input type="date" value={selectedDate} max={new Date().toISOString().split("T")[0]} onChange={e => setSelectedDate(e.target.value)} className="bg-surface-inset border hairline px-2.5 py-1.5 text-paper font-mono-data text-[11px] focus:border-amber-sand focus:outline-none cursor-pointer" style={{ colorScheme: "dark" }} />
                   {selectedDate && <button onClick={() => setSelectedDate("")} className="caps-sm text-faint hover:text-alert-extreme transition-colors px-2 py-1.5 border hairline">✕ Live</button>}
                 </div>
-                <span className="caps-sm text-faint">{selectedDate ? "Historical snapshot" : "Benchmark · alert · pattern · no judgment"}</span>
+                <span className="caps-sm text-faint">{selectedDate ? "Historical snapshot": loading ? "Fetching fresh data…" :fromCache ? "Cached · refreshing…" :"Benchmark · alert · pattern · no judgment"}</span>
               </div>
             </div>
 
