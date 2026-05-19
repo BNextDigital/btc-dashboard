@@ -119,6 +119,24 @@ function fmtPct(val: number | null): string {
   return ` (${val >= 0 ? "+" : ""}${val.toFixed(1)}%)`;
 }
 
+function dxyLevelLabel(val: number | null): { label: string; color: string } {
+  if (val === null) return { label: "", color: "" };
+  if (val > 108)  return { label: "Significant tightening", color: "#E24B4A" };
+  if (val > 105)  return { label: "Increasing risk",        color: "#E24B4A" };
+  if (val > 103)  return { label: "Tightening",             color: "#D9A84D" };
+  if (val >= 100) return { label: "Neutral",                color: "#6B6966" };
+  return              { label: "Loose",                     color: "#7AB648" };
+}
+
+function dxyChgLabel(pct: number | null): { label: string; color: string } {
+  if (pct === null) return { label: "", color: "" };
+  const abs = Math.abs(pct);
+  if (abs >= 4)  return { label: "Very large move", color: "#E24B4A" };
+  if (abs >= 2)  return { label: "Strong move",     color: "#D9A84D" };
+  if (abs >= 1)  return { label: "Watch",           color: "#D9A84D" };
+  return              { label: "Normal",            color: "#6B6966" };
+}
+
 function chgColor(val: number | null, invertPositive = false): string {
   if (val === null) return "text-slate-500";
   const positive = val > 0;
@@ -235,25 +253,54 @@ function YieldTable({ yields, curve }: { yields: MacroMetrics["yields"]; curve: 
 function DXYCard({ dxy }: { dxy: MacroMetrics["dxy"] }) {
   if (dxy.error && !dxy.current)
     return <ErrorCard title="DXY Dollar Index" error={dxy.error} />;
+
+  const level = dxyLevelLabel(dxy.current);
+  const chg5  = dxyChgLabel(dxy.d5_pct);
+  const chg20 = dxyChgLabel(dxy.d20_pct);
+
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
       <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-1">DXY Dollar Index</div>
-      <div className="font-mono text-3xl text-slate-100 mb-4">
-        {dxy.current?.toFixed(2) ?? "–"}
+
+      {/* Current value + level interpretation */}
+      <div className="flex items-baseline gap-3 mb-1">
+        <div className="font-mono text-3xl text-slate-100">
+          {dxy.current?.toFixed(2) ?? "–"}
+        </div>
+        {level.label && (
+          <span className="font-mono text-xs" style={{ color: level.color }}>
+            {level.label}
+          </span>
+        )}
       </div>
-      <div className="space-y-2 text-sm border-t border-slate-900 pt-3">
+
+      <div className="space-y-2 text-sm border-t border-slate-900 pt-3 mt-3">
+        {/* T-5 row */}
         <div className="flex justify-between items-baseline">
           <span className="text-slate-600">T−5 (1w)</span>
-          <span className={`font-mono text-xs ${chgColor(dxy.d5_chg, true)}`}>
-            {fmtChg(dxy.d5_chg)}{fmtPct(dxy.d5_pct)}
-          </span>
+          <div className="flex items-baseline gap-2">
+            {chg5.label && chg5.label !== "Normal" && (
+              <span className="font-mono text-xs" style={{ color: chg5.color }}>{chg5.label}</span>
+            )}
+            <span className={`font-mono text-xs ${chgColor(dxy.d5_chg, true)}`}>
+              {fmtChg(dxy.d5_chg)}{fmtPct(dxy.d5_pct)}
+            </span>
+          </div>
         </div>
+
+        {/* T-20 row */}
         <div className="flex justify-between items-baseline">
           <span className="text-slate-600">T−20 (1m)</span>
-          <span className={`font-mono text-xs ${chgColor(dxy.d20_chg, true)}`}>
-            {fmtChg(dxy.d20_chg)}{fmtPct(dxy.d20_pct)}
-          </span>
+          <div className="flex items-baseline gap-2">
+            {chg20.label && chg20.label !== "Normal" && (
+              <span className="font-mono text-xs" style={{ color: chg20.color }}>{chg20.label}</span>
+            )}
+            <span className={`font-mono text-xs ${chgColor(dxy.d20_chg, true)}`}>
+              {fmtChg(dxy.d20_chg)}{fmtPct(dxy.d20_pct)}
+            </span>
+          </div>
         </div>
+
         <div className="flex justify-between items-baseline">
           <span className="text-slate-600">52w percentile</span>
           <span className="font-mono text-xs text-slate-400">
@@ -261,6 +308,7 @@ function DXYCard({ dxy }: { dxy: MacroMetrics["dxy"] }) {
           </span>
         </div>
       </div>
+
       <PercentileBar value={dxy.percentile} />
       <div className="mt-3 flex flex-col gap-1.5">
         <Badge alert={dxy.alert} />
