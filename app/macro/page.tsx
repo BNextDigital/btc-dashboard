@@ -150,6 +150,14 @@ function yieldChgColor(val: number | null): string {
   return val > 0 ? "text-red-400" : "text-green-400";
 }
 
+function oasChgLabel(chg: number | null): { label: string; color: string } {
+  if (chg === null) return { label: "", color: "" };
+  if (chg > 1.0)  return { label: "Rapid deterioration", color: "#E24B4A" };
+  if (chg > 0.5)  return { label: "Clear tightening",    color: "#E24B4A" };
+  if (chg > 0.2)  return { label: "Watch",               color: "#D9A84D" };
+  return               { label: "Normal",               color: "#6B6966" };
+}
+
 function PercentileBar({ value }: { value: number | null }) {
   if (value === null) return <span className="text-slate-600 font-mono text-xs">–</span>;
   const color =
@@ -378,11 +386,19 @@ function HYOASCard({ hy_oas }: { hy_oas: MacroMetrics["hy_oas"] }) {
           </span>
         </div>
         <div className="flex justify-between items-baseline">
-          <span className="text-slate-600">T−20 (1m)</span>
-          <span className={`font-mono text-xs ${chgColor(hy_oas.d20_chg, true)}`}>
-            {hy_oas.d20_chg !== null ? `${hy_oas.d20_chg >= 0 ? "+" : ""}${hy_oas.d20_chg.toFixed(2)}%` : "–"}
-          </span>
-        </div>
+  <span className="text-slate-600">T−20 (1m)</span>
+  <div className="flex items-baseline gap-2">
+    {(() => {
+      const chg20 = oasChgLabel(hy_oas.d20_chg);
+      return chg20.label && chg20.label !== "Normal" ? (
+        <span className="font-mono text-xs" style={{ color: chg20.color }}>{chg20.label}</span>
+      ) : null;
+    })()}
+    <span className={`font-mono text-xs ${chgColor(hy_oas.d20_chg, true)}`}>
+      {hy_oas.d20_chg !== null ? `${hy_oas.d20_chg >= 0 ? "+" : ""}${hy_oas.d20_chg.toFixed(2)}%` : "–"}
+    </span>
+  </div>
+</div>
         <div className="flex justify-between items-baseline">
           <span className="text-slate-600">90d percentile</span>
           <span className="font-mono text-xs text-slate-400">
