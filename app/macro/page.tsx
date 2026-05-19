@@ -368,19 +368,19 @@ function HYOASCard({ hy_oas }: { hy_oas: MacroMetrics["hy_oas"] }) {
     <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
       <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-1">HY Credit Spread (OAS)</div>
       <div className="font-mono text-3xl text-slate-100 mb-4">
-        {hy_oas.current !== null ? `${hy_oas.current.toFixed(1)}bp` : "–"}
+        {hy_oas.current !== null ? `${hy_oas.current.toFixed(2)}%` : "–"}
       </div>
       <div className="space-y-2 text-sm border-t border-slate-900 pt-3">
         <div className="flex justify-between items-baseline">
           <span className="text-slate-600">T−5 (1w)</span>
           <span className={`font-mono text-xs ${chgColor(hy_oas.d5_chg, true)}`}>
-            {hy_oas.d5_chg !== null ? `${hy_oas.d5_chg >= 0 ? "+" : ""}${hy_oas.d5_chg.toFixed(1)}bp` : "–"}
+            {hy_oas.d5_chg !== null ? `${hy_oas.d5_chg >= 0 ? "+" : ""}${hy_oas.d5_chg.toFixed(2)}%` : "–"}
           </span>
         </div>
         <div className="flex justify-between items-baseline">
           <span className="text-slate-600">T−20 (1m)</span>
           <span className={`font-mono text-xs ${chgColor(hy_oas.d20_chg, true)}`}>
-            {hy_oas.d20_chg !== null ? `${hy_oas.d20_chg >= 0 ? "+" : ""}${hy_oas.d20_chg.toFixed(1)}bp` : "–"}
+            {hy_oas.d20_chg !== null ? `${hy_oas.d20_chg >= 0 ? "+" : ""}${hy_oas.d20_chg.toFixed(2)}%` : "–"}
           </span>
         </div>
         <div className="flex justify-between items-baseline">
