@@ -645,9 +645,9 @@ const Header = ({ price, change24h }: { price: string; change24h: string }) => (
       </div>
       
       <div className="flex items-center gap-6">
-        <Link href="/macro" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300">
+        <a href="/macro" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300">
   Macro
-</Link>
+</a>
         <div className="text-right"><div className="caps-sm text-faint">Spot</div><div className="font-mono-data text-paper text-[15px]">{price} <span className={`text-[12px] ${change24h.startsWith("+") ? "text-neutral-sage" : "text-alert-extreme"}`}>{change24h}</span></div></div>
         <div className="text-right hidden sm:block"><div className="caps-sm text-faint">Snapshot</div><div className="font-mono-data text-paper-2 text-[12px]" suppressHydrationWarning>{new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" })}</div></div>
         <div className="flex items-center gap-1.5 pl-4 border-l hairline"><Circle size={7} fill="#8DA078" stroke="none" className="pulse-dot" /><span className="caps-sm text-neutral-sage">Live</span></div>
