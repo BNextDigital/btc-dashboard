@@ -196,16 +196,16 @@ function YieldTable({ yields, curve }: { yields: MacroMetrics["yields"]; curve: 
               <tr key={t} className={`border-b border-slate-900 hover:bg-slate-900 transition-colors ${i === tenors.length - 1 ? "border-b-0" : ""}`}>
                 <td className="px-4 py-3 font-mono text-slate-500 text-xs">{t.toUpperCase()}</td>
                 <td className="px-4 py-3 font-mono text-right text-base text-slate-100">
-                  {y.current !== null ? `${y.current.toFixed(2)}%` : "–"}
+                  {y.current != null ? `${y.current.toFixed(2)}%` : "–"}
                 </td>
                 <td className={`px-4 py-3 font-mono text-right text-xs ${yieldChgColor(y.d1_chg)}`}>
-                  {y.d1_chg !== null ? `${y.d1_chg >= 0 ? "+" : ""}${y.d1_chg.toFixed(3)}` : "–"}
+                  {y.d1_chg != null ? `${y.d1_chg >= 0 ? "+" : ""}${y.d1_chg.toFixed(3)}` : "–"}
                 </td>
                 <td className={`px-4 py-3 font-mono text-right text-xs ${yieldChgColor(y.d5_chg)}`}>
-                  {y.d5_chg !== null ? `${y.d5_chg >= 0 ? "+" : ""}${y.d5_chg.toFixed(3)}` : "–"}
+                  {y.d5_chg != null ? `${y.d5_chg >= 0 ? "+" : ""}${y.d5_chg.toFixed(3)}` : "–"}
                 </td>
                 <td className="px-4 py-3">
-                  <PercentileBar value={y.percentile} />
+                  <PercentileBar value={y.percentile ?? null} />
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Badge alert={y.alert} />
