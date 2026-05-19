@@ -17,7 +17,6 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -538,12 +537,12 @@ export default function MacroDashboard() {
 
           {/* Nav — matches BTC page nav pattern */}
           <nav className="flex gap-1">
-            <Link
+            <a
               href="/"
               className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors"
             >
               BTC
-            </Link>
+            </a>
             <span
               className="text-xs px-3 py-1.5 rounded-md border font-mono"
               style={{ background: "#1C1C1E", color: "#D9A84D", borderColor: "#3A3228" }}
