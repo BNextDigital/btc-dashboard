@@ -64,6 +64,11 @@ type Metric = {
   alertLevel: "extreme" | "notable" | "neutral" | "none";
   pattern: string; spark: number[]; updated: string;
   _is_override: boolean; _is_historical?: boolean; _date?: string;
+  exchange_rates?: Record<string, number>;
+  spread?: number;
+  spread_label?: string;
+  high_exchange?: string;
+  low_exchange?: string;
 };
 
 type StablecoinData = {
@@ -848,7 +853,28 @@ useEffect(() => {
         fetch(`${API}/crypto-proxies`).then(r => r.json()).then(d => { if (d.crypto_proxies) setProxyStocks(Object.values(d.crypto_proxies) as ProxyStock[]); }).catch(err => console.error("[proxy stocks]", err));
         const transformed: Metric[] = Object.entries(data)
           .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance")
-          .map(([id, raw]) => { const m = raw as Record<string, unknown>; return { id, name: m.name as string, category: m.category as string, current: m.current as string, currentDir: m.current_dir as "up" | "down" | "flat", d7: m.d7 as string, vs30d: m.vs30d as string, percentile: m.percentile as number, alert: m.alert as string, alertLevel: m.alert_level as "extreme" | "notable" | "neutral" | "none", pattern: m.pattern as string, spark: (m.spark as number[]) ?? [], updated: "just now", _is_override: (m._is_override ?? false) as boolean }; });
+          .map(([id, raw]) => { const m = raw as Record<string, unknown>; return {
+  id,
+  name:           m.name as string,
+  category:       m.category as string,
+  current:        m.current as string,
+  currentDir:     m.current_dir as "up" | "down" | "flat",
+  d7:             m.d7 as string,
+  vs30d:          m.vs30d as string,
+  percentile:     m.percentile as number,
+  alert:          m.alert as string,
+  alertLevel:     m.alert_level as "extreme" | "notable" | "neutral" | "none",
+  pattern:        m.pattern as string,
+  spark:          (m.spark as number[]) ?? [],
+  updated:        "just now",
+  _is_override:   (m._is_override ?? false) as boolean,
+  // ── Funding spread fields ──
+  exchange_rates: (m.exchange_rates ?? {}) as Record<string, number>,
+  spread:         (m.spread ?? 0) as number,
+  spread_label:   (m.spread_label ?? "") as string,
+  high_exchange:  (m.high_exchange ?? "") as string,
+  low_exchange:   (m.low_exchange ?? "") as string,
+}; });
         // Persist to localStorage for instant render on next load
 try {
   localStorage.setItem(METRICS_CACHE_KEY, JSON.stringify({
