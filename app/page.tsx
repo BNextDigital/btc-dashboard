@@ -1012,7 +1012,7 @@ setSummary(summaryData);
       : (historicalMetrics ?? []).map((m, i) =>
           m.id === "funding"
   ? <FundingCard key={m.id} metric={m as any} />
-  : <MetricCard key={m.id} metric={m} index={i} /> />
+  : <MetricCard key={m.id} metric={m} index={i} /> 
         )
   ) : (
     loading && metrics.length === 0
