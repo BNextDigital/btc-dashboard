@@ -45,6 +45,10 @@ interface MacroMetrics {
   vxn?: VolatilityCard;
   sp500?: EquitySMACard;
   brent?: EquitySMACard;
+  gold?: EquitySMACard;
+  silver?: EquitySMACard;
+  platinum?: EquitySMACard;
+  copper?: EquitySMACard;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
@@ -337,6 +341,20 @@ export default function MacroDashboard() {
               <VolCard title="VXN (Nasdaq Vol)" data={macro.vxn} />
               <SMAPriceCard title="S&P 500" data={macro.sp500} />
               <SMAPriceCard title="Brent Crude Oil" data={macro.brent} />
+            </div>
+          </section>
+        )}
+
+
+        {/* IV. Metals */}
+        {macro && (
+          <section>
+            <SectionLabel num="IV" title="Metals — SMA Analysis" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SMAPriceCard title="Gold" data={macro.gold} />
+              <SMAPriceCard title="Silver" data={macro.silver} />
+              <SMAPriceCard title="Platinum" data={macro.platinum} />
+              <SMAPriceCard title="Copper" data={macro.copper} />
             </div>
           </section>
         )}
