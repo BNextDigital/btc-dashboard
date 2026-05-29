@@ -940,7 +940,23 @@ setSummary(summaryData);
     <>
       <style>{FONT_LINK}</style>
       <div className="min-h-screen bg-ink text-paper font-sans-body grid-bg">
-        <Header price={price.price} change24h={price.change_24h} />
+        <Header price={price.price} change24h={price.change_24h} /> 
+        const flushCache = async () => {
+  await Promise.all([
+    fetch(`${API}/cache/flush`),
+    fetch(`${API}/macro/cache/flush`),
+  ]);
+  localStorage.removeItem("btc_metrics_v1");
+  fetchAll();
+};
+
+// In the header JSX, next to the nav:
+<button
+  onClick={flushCache}
+  className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-600 hover:text-slate-300 hover:border-slate-600 transition-colors font-mono"
+>
+  ↺ flush cache
+</button>
         <main className="max-w-[1440px] mx-auto px-8 py-8 space-y-10">
 
           {/* Market state bar */}
