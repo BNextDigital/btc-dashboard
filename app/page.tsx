@@ -750,20 +750,30 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
   );
 };
 
-const Header = ({ price, change24h }: { price: string; change24h: string }) => (
+const Header = ({ price, change24h, onFlushCache, flushing }: { 
+  price: string; 
+  change24h: string;
+  onFlushCache: () => void;
+  flushing: boolean;
+}) => (
   <header className="hairline-b">
     <div className="max-w-[1440px] mx-auto px-8 py-5 flex items-center justify-between">
       <div className="flex items-baseline gap-6">
         <h1 className="font-display text-paper text-[30px] leading-none tracking-tight">BTC<span className="font-display-italic text-amber-sand"> · </span><span className="font-display-italic">Decision</span> Desk</h1>
         <span className="caps-sm text-faint hidden md:inline">AI organizes · humans decide</span>
       </div>
-      
       <div className="flex items-center gap-6">
-        <a href="/macro" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300">
-  Macro
-</a>
+        <a href="/macro" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300">Macro</a>
         <div className="text-right"><div className="caps-sm text-faint">Spot</div><div className="font-mono-data text-paper text-[15px]">{price} <span className={`text-[12px] ${change24h.startsWith("+") ? "text-neutral-sage" : "text-alert-extreme"}`}>{change24h}</span></div></div>
         <div className="text-right hidden sm:block"><div className="caps-sm text-faint">Snapshot</div><div className="font-mono-data text-paper-2 text-[12px]" suppressHydrationWarning>{new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" })}</div></div>
+        {/* Flush cache button */}
+        <button
+          onClick={onFlushCache}
+          disabled={flushing}
+          className="caps-sm text-faint hover:text-paper transition-colors disabled:opacity-40"
+        >
+          {flushing ? "flushing…" : "↺ flush"}
+        </button>
         <div className="flex items-center gap-1.5 pl-4 border-l hairline"><Circle size={7} fill="#8DA078" stroke="none" className="pulse-dot" /><span className="caps-sm text-neutral-sage">Live</span></div>
       </div>
     </div>
@@ -901,6 +911,18 @@ setSummary(summaryData);
     return () => clearInterval(id);
   }, []);
 
+// ← add flushCache here
+const flushCache = async () => {
+  setFlushing(true);
+  await Promise.all([
+    fetch(`${API}/cache/flush`),
+    fetch(`${API}/macro/cache/flush`),
+  ]);
+  localStorage.removeItem("btc_metrics_v1");
+  await fetchAll();
+  setFlushing(false);
+};
+  
   // ── Historical fetch — separate useEffect at component level ───────────
   // FIX: this was previously nested inside fetchAll causing React error #321
   useEffect(() => {
@@ -940,23 +962,11 @@ setSummary(summaryData);
     <>
       <style>{FONT_LINK}</style>
       <div className="min-h-screen bg-ink text-paper font-sans-body grid-bg">
-        <Header price={price.price} change24h={price.change_24h} /> 
-        const flushCache = async () => {
-  await Promise.all([
-    fetch(`${API}/cache/flush`),
-    fetch(`${API}/macro/cache/flush`),
-  ]);
-  localStorage.removeItem("btc_metrics_v1");
-  fetchAll();
-};
-
-// In the header JSX, next to the nav:
-<button
-  onClick={flushCache}
-  className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-600 hover:text-slate-300 hover:border-slate-600 transition-colors font-mono"
->
-  ↺ flush cache
-</button>
+       <Header price={price.price} change24h={price.change_24h} onFlushCache={flushCache} flushing={flushing} />
+      className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-600 hover:text-slate-300 hover:border-slate-600 transition-colors font-mono"
+    >
+      {flushing ? "flushing…" : "↺ flush cache"}
+    </button>
         <main className="max-w-[1440px] mx-auto px-8 py-8 space-y-10">
 
           {/* Market state bar */}
