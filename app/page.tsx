@@ -962,11 +962,6 @@ const flushCache = async () => {
     <>
       <style>{FONT_LINK}</style>
       <div className="min-h-screen bg-ink text-paper font-sans-body grid-bg">
-       <Header price={price.price} change24h={price.change_24h} onFlushCache={flushCache} flushing={flushing} />
-      className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-600 hover:text-slate-300 hover:border-slate-600 transition-colors font-mono"
-    >
-      {flushing ? "flushing…" : "↺ flush cache"}
-    </button>
         <main className="max-w-[1440px] mx-auto px-8 py-8 space-y-10">
 
           {/* Market state bar */}
