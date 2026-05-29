@@ -803,6 +803,7 @@ export default function BTCDecisionDashboard() {
   const [executions, setExecutions] = useState<any[]>([]);
   const [proxyStocks, setProxyStocks] = useState<ProxyStock[]>([]);
   const [fromCache, setFromCache] = useState(false);
+  const [flushing, setFlushing] = useState(false);
 
 // In the mount useEffect, after setLoading(false):
 
