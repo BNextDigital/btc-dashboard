@@ -995,6 +995,8 @@ return (
     <>
       <style>{FONT_LINK}</style>
       <div className="min-h-screen bg-ink text-paper font-sans-body grid-bg">
+        <Header price={price.price} change24h={price.change_24h} onFlushCache={flushCache} flushing={flushing} />
+        <main className="max-w-[1440px] mx-auto px-8 py-8 space-y-10">
 
           {/* Market state bar */}
           <div className="flex flex-wrap items-center gap-6 bg-surface border hairline px-5 py-4">
