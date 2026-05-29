@@ -257,8 +257,6 @@ export default function MacroDashboard() {
           <nav className="flex gap-1">
             <a href="/" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors">BTC</a>
             <span className="text-xs px-3 py-1.5 rounded-md border font-mono" style={{ background: "#1C1C1E", color: "#D9A84D", borderColor: "#3A3228" }}>Macro</span>
-
-// In the header JSX, next to the nav:
 <button
   onClick={flushCache}
   className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-600 hover:text-slate-300 hover:border-slate-600 transition-colors font-mono"
