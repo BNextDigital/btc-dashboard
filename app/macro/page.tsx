@@ -224,6 +224,15 @@ export default function MacroDashboard() {
     }
   }, []);
 
+  const flushCache = async () => {
+  await Promise.all([
+    fetch(`${API}/cache/flush`),
+    fetch(`${API}/macro/cache/flush`),
+  ]);
+  localStorage.removeItem("btc_metrics_v1");
+  fetchAll();
+};
+  
   useEffect(() => {
     fetchAll();
     const t = setInterval(fetchAll, REFRESH_INTERVAL);
@@ -248,15 +257,6 @@ export default function MacroDashboard() {
           <nav className="flex gap-1">
             <a href="/" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors">BTC</a>
             <span className="text-xs px-3 py-1.5 rounded-md border font-mono" style={{ background: "#1C1C1E", color: "#D9A84D", borderColor: "#3A3228" }}>Macro</span>
-
-            const flushCache = async () => {
-  await Promise.all([
-    fetch(`${API}/cache/flush`),
-    fetch(`${API}/macro/cache/flush`),
-  ]);
-  localStorage.removeItem("btc_metrics_v1");
-  fetchAll();
-};
 
 // In the header JSX, next to the nav:
 <button
