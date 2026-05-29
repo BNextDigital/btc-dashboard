@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import TradingViewEmbed from "./components/TradingViewEmbed";
 import TradingViewCME from "./components/TradingViewCME";
+import { useEffect, useState, useCallback } from "react";
 
 const FONT_LINK = `
   @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
@@ -788,6 +789,7 @@ const SectionLabel = ({ numeral, title, subtitle }: { numeral: string; title: st
 );
 
 export default function BTCDecisionDashboard() {
+  // ── State ────────────────────────────────────────────────────────────────
   const [judgment, setJudgment] = useState<JudgmentState>({ read: "", supports: "", contradicts: "", invalidates: "", plan: "", risk: null });
   const [logs, setLogs]         = useState<TradeLog[]>(INITIAL_TRADE_LOGS);
   const [now, setNow]           = useState(new Date());
@@ -803,129 +805,135 @@ export default function BTCDecisionDashboard() {
   const [executions, setExecutions] = useState<any[]>([]);
   const [proxyStocks, setProxyStocks] = useState<ProxyStock[]>([]);
   const [fromCache, setFromCache] = useState(false);
-  const [flushing, setFlushing] = useState(false);
-
-// In the mount useEffect, after setLoading(false):
-
-
-// In fetchAll, after the cache write, add:
-
-
-  // ── Date picker state ──────────────────────────────────────────────────
-  const [selectedDate, setSelectedDate]             = useState<string>("");
-  const [historicalMetrics, setHistoricalMetrics]   = useState<Metric[] | null>(null);
-  const [historicalLoading, setHistoricalLoading]   = useState(false);
-  const [historicalError, setHistoricalError]       = useState<string | null>(null);
+  const [flushing, setFlushing]   = useState(false);
+ 
+  // ── Date picker state ────────────────────────────────────────────────────
+  const [selectedDate, setSelectedDate]                 = useState<string>("");
+  const [historicalMetrics, setHistoricalMetrics]       = useState<Metric[] | null>(null);
+  const [historicalLoading, setHistoricalLoading]       = useState(false);
+  const [historicalError, setHistoricalError]           = useState<string | null>(null);
   const [historicalStablecoin, setHistoricalStablecoin] = useState<StablecoinData | null>(null);
   const [historicalDominance, setHistoricalDominance]   = useState<DominanceData | null>(null);
-
+ 
+  // ── Clock tick ───────────────────────────────────────────────────────────
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(id);
   }, []);
-
-  // Render cached data immediately on mount — no loading skeletons
-useEffect(() => {
-  try {
-    const raw = localStorage.getItem(METRICS_CACHE_KEY);
-    if (!raw) return;
-    const cached = JSON.parse(raw);
-    if (cached.metrics)    setMetrics(cached.metrics);
-    if (cached.stablecoin) setStablecoinData(cached.stablecoin);
-    if (cached.dominance)  setDominanceData(cached.dominance);
-    if (cached.price)      setPrice(cached.price);
-    if (cached.summary)    setSummary(cached.summary);
-    if (cached.news)       setNews(cached.news);
-    setLoading(false); // skip skeletons — show cached cards immediately
-    setFromCache(true);
-  } catch (e) {
-    // ignore — cache miss or parse error, fetchAll will populate normally
-  }
-}, []); // runs once on mount only
  
-  // ── Main data fetch ────────────────────────────────────────────────────
+  // ── Render cached data immediately on mount ──────────────────────────────
   useEffect(() => {
-    const fetchAll = async () => {
+    try {
+      const raw = localStorage.getItem(METRICS_CACHE_KEY);
+      if (!raw) return;
+      const cached = JSON.parse(raw);
+      if (cached.metrics)    setMetrics(cached.metrics);
+      if (cached.stablecoin) setStablecoinData(cached.stablecoin);
+      if (cached.dominance)  setDominanceData(cached.dominance);
+      if (cached.price)      setPrice(cached.price);
+      if (cached.summary)    setSummary(cached.summary);
+      if (cached.news)       setNews(cached.news);
+      setLoading(false);
+      setFromCache(true);
+    } catch (e) {
+      // ignore — cache miss or parse error
+    }
+  }, []);
+ 
+  // ── Main data fetch ───────────────────────────────────────────────────────
+  const fetchAll = useCallback(async () => {
+    try {
+      setLoading(true); setError(null);
+      const metricsRes = await fetch(`${API}/metrics`);
+      if (!metricsRes.ok) throw new Error(`Backend returned ${metricsRes.status}`);
+      const data = await metricsRes.json();
+      const [priceRes, summaryRes] = await Promise.all([fetch(`${API}/price`), fetch(`${API}/summary`)]);
+      const newsRes   = await fetch(`${API}/news`);   const newsData   = await newsRes.json();   if (newsData.items) setNews(newsData.items);
+      const causalRes = await fetch(`${API}/causal`); const causalData = await causalRes.json(); setCausal(causalData);
+      const priceData   = await priceRes.json();
+      const summaryData = await summaryRes.json();
+      const tradeLogRes = await fetch(`${API}/trade-log`);       const tradeLogData = await tradeLogRes.json(); if (Array.isArray(tradeLogData) && tradeLogData.length > 0) setLogs(tradeLogData);
+      const execRes     = await fetch(`${API}/trade-execution`); const execData     = await execRes.json();     if (Array.isArray(execData)) setExecutions(execData);
+      if (data["stablecoin_supply"]) setStablecoinData(data["stablecoin_supply"] as StablecoinData);
+      if (data["btc_dominance"])     setDominanceData(data["btc_dominance"] as DominanceData);
+      // Proxy stocks — intentionally not awaited (slow yFinance calls, 5-min backend cache)
+      fetch(`${API}/crypto-proxies`)
+        .then(r => r.json())
+        .then(d => { if (d.crypto_proxies) setProxyStocks(Object.values(d.crypto_proxies) as ProxyStock[]); })
+        .catch(err => console.error("[proxy stocks]", err));
+      const transformed: Metric[] = Object.entries(data)
+        .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance")
+        .map(([id, raw]) => {
+          const m = raw as Record<string, unknown>;
+          return {
+            id,
+            name:           m.name           as string,
+            category:       m.category       as string,
+            current:        m.current        as string,
+            currentDir:     m.current_dir    as "up" | "down" | "flat",
+            d7:             m.d7             as string,
+            vs30d:          m.vs30d          as string,
+            percentile:     m.percentile     as number,
+            alert:          m.alert          as string,
+            alertLevel:     m.alert_level    as "extreme" | "notable" | "neutral" | "none",
+            pattern:        m.pattern        as string,
+            spark:          (m.spark         as number[]) ?? [],
+            updated:        "just now",
+            _is_override:   (m._is_override  ?? false) as boolean,
+            exchange_rates: (m.exchange_rates ?? {})   as Record<string, number>,
+            spread:         (m.spread        ?? 0)     as number,
+            spread_label:   (m.spread_label  ?? "")    as string,
+            high_exchange:  (m.high_exchange ?? "")    as string,
+            low_exchange:   (m.low_exchange  ?? "")    as string,
+          };
+        });
+      // Persist to localStorage for instant render on next load
       try {
-        setLoading(true); setError(null);
-        const metricsRes = await fetch(`${API}/metrics`);
-        if (!metricsRes.ok) throw new Error(`Backend returned ${metricsRes.status}`);
-        const data = await metricsRes.json();
-        //await new Promise(r => setTimeout(r, 1000));
-        const [priceRes, summaryRes] = await Promise.all([fetch(`${API}/price`), fetch(`${API}/summary`)]);
-        const newsRes = await fetch(`${API}/news`); const newsData = await newsRes.json(); if (newsData.items) setNews(newsData.items);
-        const causalRes = await fetch(`${API}/causal`); const causalData = await causalRes.json(); setCausal(causalData);
-        const priceData = await priceRes.json(); const summaryData = await summaryRes.json();
-        const tradeLogRes = await fetch(`${API}/trade-log`); const tradeLogData = await tradeLogRes.json(); if (Array.isArray(tradeLogData) && tradeLogData.length > 0) setLogs(tradeLogData);
-        const execRes = await fetch(`${API}/trade-execution`); const execData = await execRes.json(); if (Array.isArray(execData)) setExecutions(execData);
-        if (data["stablecoin_supply"]) setStablecoinData(data["stablecoin_supply"] as StablecoinData);
-        if (data["btc_dominance"]) setDominanceData(data["btc_dominance"] as DominanceData);
-        // Proxy stocks — intentionally not awaited (slow yFinance calls, 5-min backend cache)
-        fetch(`${API}/crypto-proxies`).then(r => r.json()).then(d => { if (d.crypto_proxies) setProxyStocks(Object.values(d.crypto_proxies) as ProxyStock[]); }).catch(err => console.error("[proxy stocks]", err));
-        const transformed: Metric[] = Object.entries(data)
-          .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance")
-          .map(([id, raw]) => { const m = raw as Record<string, unknown>; return {
-  id,
-  name:           m.name as string,
-  category:       m.category as string,
-  current:        m.current as string,
-  currentDir:     m.current_dir as "up" | "down" | "flat",
-  d7:             m.d7 as string,
-  vs30d:          m.vs30d as string,
-  percentile:     m.percentile as number,
-  alert:          m.alert as string,
-  alertLevel:     m.alert_level as "extreme" | "notable" | "neutral" | "none",
-  pattern:        m.pattern as string,
-  spark:          (m.spark as number[]) ?? [],
-  updated:        "just now",
-  _is_override:   (m._is_override ?? false) as boolean,
-  // ── Funding spread fields ──
-  exchange_rates: (m.exchange_rates ?? {}) as Record<string, number>,
-  spread:         (m.spread ?? 0) as number,
-  spread_label:   (m.spread_label ?? "") as string,
-  high_exchange:  (m.high_exchange ?? "") as string,
-  low_exchange:   (m.low_exchange ?? "") as string,
-}; });
-        // Persist to localStorage for instant render on next load
-try {
-  localStorage.setItem(METRICS_CACHE_KEY, JSON.stringify({
-    metrics:    transformed,
-    stablecoin: data["stablecoin_supply"] ?? null,
-    dominance:  data["btc_dominance"]     ?? null,
-    price:      priceData,
-    summary:    summaryData,
-    news:       newsData.items ?? [],
-    ts:         Date.now(),
-  }));
-} catch (e) {
-  // ignore — storage full or disabled
-}
-setFromCache(false);
-setMetrics(transformed);
-setPrice(priceData);
-setSummary(summaryData);
-      } catch (e) { setError(e instanceof Error ? e.message : "Unknown error"); setMetrics([]); }
-      finally { setLoading(false); }
-    };
+        localStorage.setItem(METRICS_CACHE_KEY, JSON.stringify({
+          metrics:    transformed,
+          stablecoin: data["stablecoin_supply"] ?? null,
+          dominance:  data["btc_dominance"]     ?? null,
+          price:      priceData,
+          summary:    summaryData,
+          news:       newsData.items ?? [],
+          ts:         Date.now(),
+        }));
+      } catch (e) {
+        // ignore — storage full or disabled
+      }
+      setFromCache(false);
+      setMetrics(transformed);
+      setPrice(priceData);
+      setSummary(summaryData);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+      setMetrics([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+ 
+  // ── Flush cache ───────────────────────────────────────────────────────────
+  const flushCache = async () => {
+    setFlushing(true);
+    await Promise.all([
+      fetch(`${API}/cache/flush`),
+      fetch(`${API}/macro/cache/flush`),
+    ]);
+    localStorage.removeItem("btc_metrics_v1");
+    await fetchAll();
+    setFlushing(false);
+  };
+ 
+  // ── Poll every 60s ────────────────────────────────────────────────────────
+  useEffect(() => {
     fetchAll();
     const id = setInterval(fetchAll, 60000);
     return () => clearInterval(id);
-  }, []);
-
-// ← add flushCache here
-const flushCache = async () => {
-  setFlushing(true);
-  await Promise.all([
-    fetch(`${API}/cache/flush`),
-    fetch(`${API}/macro/cache/flush`),
-  ]);
-  localStorage.removeItem("btc_metrics_v1");
-  await fetchAll();
-  setFlushing(false);
-};
-  
-  // ── Historical fetch — separate useEffect at component level ───────────
-  // FIX: this was previously nested inside fetchAll causing React error #321
+  }, [fetchAll]);
+ 
+  // ── Historical fetch ──────────────────────────────────────────────────────
+  // Separate useEffect — was previously nested inside fetchAll causing React error #321
   useEffect(() => {
     if (!selectedDate) {
       setHistoricalMetrics(prev => prev !== null ? null : prev);
@@ -937,30 +945,53 @@ const flushCache = async () => {
     const fetchHistorical = async () => {
       setHistoricalLoading(true); setHistoricalError(null);
       try {
-        const res = await fetch(`${API}/metrics/history?date=${selectedDate}`);
+        const res  = await fetch(`${API}/metrics/history?date=${selectedDate}`);
         const json = await res.json();
-        if (json.error || json.count === 0) { setHistoricalError(json.error ?? `No data found for ${selectedDate}`); setHistoricalMetrics([]); return; }
+        if (json.error || json.count === 0) {
+          setHistoricalError(json.error ?? `No data found for ${selectedDate}`);
+          setHistoricalMetrics([]);
+          return;
+        }
         const raw = json.metrics as Record<string, any>;
         if (raw["stablecoin_supply"]) setHistoricalStablecoin(raw["stablecoin_supply"] as StablecoinData);
-        if (raw["btc_dominance"]) setHistoricalDominance(raw["btc_dominance"] as DominanceData);
+        if (raw["btc_dominance"])     setHistoricalDominance(raw["btc_dominance"] as DominanceData);
         const transformed: Metric[] = Object.entries(raw)
           .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance")
-          .map(([id, m]: [string, any]) => ({ id, name: m.name, category: m.category, current: m.current, currentDir: m.current_dir ?? "flat", d7: m.d7, vs30d: m.vs30d, percentile: m.percentile, alert: m.alert, alertLevel: m.alert_level, pattern: m.pattern, spark: m.spark ?? [], updated: m.source ?? "Historical", _is_override: false, _is_historical: true, _date: selectedDate }));
+          .map(([id, m]: [string, any]) => ({
+            id,
+            name:         m.name,
+            category:     m.category,
+            current:      m.current,
+            currentDir:   m.current_dir ?? "flat",
+            d7:           m.d7,
+            vs30d:        m.vs30d,
+            percentile:   m.percentile,
+            alert:        m.alert,
+            alertLevel:   m.alert_level,
+            pattern:      m.pattern,
+            spark:        m.spark ?? [],
+            updated:      m.source ?? "Historical",
+            _is_override: false,
+            _is_historical: true,
+            _date:        selectedDate,
+          }));
         setHistoricalMetrics(transformed);
-      } catch (e) { setHistoricalError(e instanceof Error ? e.message : "Fetch failed"); }
-      finally { setHistoricalLoading(false); }
+      } catch (e) {
+        setHistoricalError(e instanceof Error ? e.message : "Fetch failed");
+      } finally {
+        setHistoricalLoading(false);
+      }
     };
     fetchHistorical();
-  }, [selectedDate]); // ← correct: only runs when selectedDate changes
-
-  const alertCounts = useMemo(() => {
-    const extreme = metrics.filter((m) => m.alertLevel === "extreme").length;
-    const notable = metrics.filter((m) => m.alertLevel === "notable").length;
-    return { extreme, notable };
-  }, [metrics]);
-
+  }, [selectedDate]);
+ 
+  // ── Derived state ─────────────────────────────────────────────────────────
+  const alertCounts = useMemo(() => ({
+    extreme: metrics.filter(m => m.alertLevel === "extreme").length,
+    notable: metrics.filter(m => m.alertLevel === "notable").length,
+  }), [metrics]);
+ 
   return (
-    <>
       <style>{FONT_LINK}</style>
       <div className="min-h-screen bg-ink text-paper font-sans-body grid-bg">
         <main className="max-w-[1440px] mx-auto px-8 py-8 space-y-10">
