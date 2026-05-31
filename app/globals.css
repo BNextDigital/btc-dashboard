@@ -1,26 +1,139 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+
+/* ── Base ──────────────────────────────────────────────────────────────── */
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #0B0B0C;
+  --foreground: #E8E4D9;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #0B0B0C;
+  color: #E8E4D9;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* ── Typography ────────────────────────────────────────────────────────── */
+
+.font-display {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+.font-display-italic {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+}
+.font-sans-body {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+.font-mono-data {
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  font-feature-settings: 'tnum';
+}
+
+/* caps-sm: used for labels, section headers, table headers */
+.caps-sm {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+/* ── Layout backgrounds ─────────────────────────────────────────────────── */
+
+.bg-ink         { background-color: #0B0B0C; }
+.bg-surface     { background-color: #131315; }
+.bg-surface-2   { background-color: #17171A; }
+.bg-surface-inset { background-color: #0E0E10; }
+
+/* ── Text colours ───────────────────────────────────────────────────────── */
+
+.text-paper     { color: #E8E4D9; }
+.text-paper-2   { color: #B8B5AA; }
+.text-muted     { color: #8A8780; }
+.text-faint     { color: #6A6860; }   /* bumped from #55534B for readability */
+.text-amber-sand  { color: #D9A84D; }
+.text-alert-extreme { color: #C4614A; }
+.text-alert-notable { color: #C89A3F; }
+.text-neutral-sage  { color: #8DA078; }
+
+/* ── Alert background tints ─────────────────────────────────────────────── */
+
+.bg-amber-sand-10 { background-color: rgba(217, 168, 77,  0.10); }
+.bg-extreme-10    { background-color: rgba(196, 97,  74,  0.10); }
+.bg-notable-10    { background-color: rgba(200, 154, 63,  0.10); }
+.bg-sage-10       { background-color: rgba(141, 160, 120, 0.10); }
+
+/* ── Border colours ─────────────────────────────────────────────────────── */
+
+.border-amber-sand { border-color: rgba(217, 168, 77,  0.35); }
+.border-extreme    { border-color: rgba(196, 97,  74,  0.35); }
+.border-notable    { border-color: rgba(200, 154, 63,  0.35); }
+.border-sage       { border-color: rgba(141, 160, 120, 0.35); }
+
+/* ── Hairlines ──────────────────────────────────────────────────────────── */
+
+.hairline   { border-color: #22231F; }
+.hairline-b { border-bottom: 1px solid #22231F; }
+.hairline-t { border-top:    1px solid #22231F; }
+
+/* ── Grid background (BTC page) ─────────────────────────────────────────── */
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right,  rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* ── Alert border accents (card borders) ────────────────────────────────── */
+
+.border-extreme-card { border-color: rgba(196, 97,  74,  0.35); }
+.border-notable-card { border-color: rgba(200, 154, 63,  0.35); }
+.border-sage-card    { border-color: rgba(141, 160, 120, 0.35); }
+
+/* ── Animations ─────────────────────────────────────────────────────────── */
+
+.pulse-dot {
+  animation: pulse-soft 2.4s ease-in-out infinite;
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.fade-in {
+  animation: fade-in 0.6s ease-out both;
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Form elements ──────────────────────────────────────────────────────── */
+
+textarea, input, select {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 14px;
+}
+textarea:focus, input:focus, select:focus {
+  outline: none;
+  border-color: #D9A84D !important;
+}
+
+/* ── Data size scale ────────────────────────────────────────────────────── */
+/* Use these instead of arbitrary px values in page components             */
+
+.data-xs   { font-size: 12px; }   /* secondary labels, footnotes          */
+.data-sm   { font-size: 13px; }   /* table rows, card body text           */
+.data-md   { font-size: 15px; }   /* primary metric values, card numbers  */
+.data-lg   { font-size: 18px; }   /* featured values (price, ratio)       */
+.data-xl   { font-size: 22px; }   /* large card headlines                 */
+.data-2xl  { font-size: 26px; }   /* section display numbers              */
