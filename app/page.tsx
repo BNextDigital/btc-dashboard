@@ -260,12 +260,12 @@ const StablecoinCard = ({ data }: { data: StablecoinData }) => {
           <div>
             <div className="flex items-center gap-1.5 mb-0.5"><div className="w-[7px] h-[7px] rounded-sm flex-shrink-0" style={{ backgroundColor: "#26A17B" }} /><span className="caps-sm text-faint">USDT · {data.usdt_share}%</span></div>
             <div className="font-mono-data text-paper text-[13px]">{data.usdt}</div>
-            <div className={`font-mono-data text-[11px] mt-0.5 ${data.usdt_7d.startsWith("+") ? "text-neutral-sage" : data.usdt_7d.startsWith("-") ? "text-alert-extreme" : "text-muted"}`}>{data.usdt_7d} 7d</div>
+            <div className={`font-mono-data text-[11px] mt-0.5 ${(data.usdt_7d ?? "").startsWith("+") ? "text-neutral-sage" : (data.usdt_7d ?? "").startsWith("-") ? "text-alert-extreme" : "text-muted"}`}>{data.usdt_7d} 7d</div>
           </div>
           <div>
             <div className="flex items-center gap-1.5 mb-0.5"><div className="w-[7px] h-[7px] rounded-sm flex-shrink-0" style={{ backgroundColor: "#2775CA" }} /><span className="caps-sm text-faint">USDC · {data.usdc_share}%</span></div>
             <div className="font-mono-data text-paper text-[13px]">{data.usdc}</div>
-            <div className={`font-mono-data text-[11px] mt-0.5 ${data.usdc_7d.startsWith("+") ? "text-neutral-sage" : data.usdc_7d.startsWith("-") ? "text-alert-extreme" : "text-muted"}`}>{data.usdc_7d} 7d</div>
+            <div className={`font-mono-data text-[11px] mt-0.5 ${(data.usdc_7d ?? "").startsWith("+") ? "text-neutral-sage" : (data.usdc_7d ?? "").startsWith("-") ? "text-alert-extreme" : "text-muted"}`}>{data.usdc_7d} 7d</div>
           </div>
         </div>
       </div>
@@ -286,7 +286,6 @@ const StablecoinCard = ({ data }: { data: StablecoinData }) => {
     </div>
   );
 };
-
 const FundingCard = ({ metric }: { metric: Metric & {
   spread?: number;
   spread_label?: string;
