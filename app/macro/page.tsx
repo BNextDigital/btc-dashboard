@@ -1,209 +1,193 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 
+// ── Design system (matches BTC page.tsx) ─────────────────────────────────
+const FONT_LINK = `
+  @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+  .font-display { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
+  .font-display-italic { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; }
+  .font-sans-body { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+  .font-mono-data { font-family: 'IBM Plex Mono', 'Courier New', monospace; font-feature-settings: 'tnum'; }
+  .hairline { border-color: #22231F; }
+  .hairline-b { border-bottom: 1px solid #22231F; }
+  .hairline-t { border-top: 1px solid #22231F; }
+  .caps-sm { letter-spacing: 0.22em; text-transform: uppercase; font-size: 9px; font-weight: 500; }
+  .bg-ink { background-color: #0B0B0C; }
+  .bg-surface { background-color: #131315; }
+  .bg-surface-2 { background-color: #17171A; }
+  .bg-surface-inset { background-color: #0E0E10; }
+  .text-paper { color: #E8E4D9; }
+  .text-paper-2 { color: #B8B5AA; }
+  .text-muted { color: #8A8780; }
+  .text-faint { color: #55534B; }
+  .text-amber-sand { color: #D9A84D; }
+  .text-alert-extreme { color: #C4614A; }
+  .text-alert-notable { color: #C89A3F; }
+  .text-neutral-sage { color: #8DA078; }
+  .bg-amber-sand-10 { background-color: rgba(217,168,77,0.10); }
+  .bg-extreme-10 { background-color: rgba(196,97,74,0.10); }
+  .bg-notable-10 { background-color: rgba(200,154,63,0.10); }
+  .bg-sage-10 { background-color: rgba(141,160,120,0.10); }
+  .border-extreme { border-color: rgba(196,97,74,0.35); }
+  .border-notable { border-color: rgba(200,154,63,0.35); }
+  .border-sage { border-color: rgba(141,160,120,0.35); }
+  .border-amber-sand { border-color: rgba(217,168,77,0.35); }
+`;
+
+// ── Types ─────────────────────────────────────────────────────────────────
 interface YieldTenor {
-  label?: string;
-  current?: number | null;
-  d1_chg?: number | null;
-  d5_chg?: number | null;
-  percentile?: number | null;
-  alert?: string;
+  label?: string; current?: number | null; d1_chg?: number | null;
+  d5_chg?: number | null; percentile?: number | null; alert?: string;
 }
-
 interface EquitySMACard {
-  current?: number | null;
-  sma20?: number | null;
-  sma50?: number | null;
-  sma200?: number | null;
-  pct_from_sma20?: number | null;
-  pct_from_sma50?: number | null;
-  pct_from_sma200?: number | null;
-  percentile?: number | null;
-  alert?: string;
-  error?: string;
+  current?: number | null; sma20?: number | null; sma50?: number | null;
+  sma200?: number | null; pct_from_sma20?: number | null;
+  pct_from_sma50?: number | null; pct_from_sma200?: number | null;
+  percentile?: number | null; alert?: string; error?: string;
 }
-
 interface VolatilityCard {
-  current?: number | null;
-  d5_chg?: number | null;
-  d20_chg?: number | null;
-  percentile?: number | null;
-  alert?: string;
-  pattern?: string;
-  error?: string;
+  current?: number | null; d5_chg?: number | null; d20_chg?: number | null;
+  percentile?: number | null; alert?: string; pattern?: string; error?: string;
 }
-
 interface MacroMetrics {
   updated_at?: string;
   yields?: Record<string, YieldTenor>;
   curve?: { spread_2y10y_bp?: number | null; label?: string };
-  dxy?: VolatilityCard;
-  vix?: VolatilityCard;
+  dxy?: VolatilityCard; vix?: VolatilityCard;
   hy_oas?: { current?: number | null; d5_chg?: number | null; d20_chg?: number | null; percentile?: number | null; alert?: string; error?: string };
-  nasdaq100?: EquitySMACard;
-  vxn?: VolatilityCard;
-  sp500?: EquitySMACard;
-  brent?: EquitySMACard;
-  gold?: EquitySMACard;
-  silver?: EquitySMACard;
-  platinum?: EquitySMACard;
-  copper?: EquitySMACard;
+  nasdaq100?: EquitySMACard; vxn?: VolatilityCard; sp500?: EquitySMACard;
+  brent?: EquitySMACard; gold?: EquitySMACard; silver?: EquitySMACard;
+  platinum?: EquitySMACard; copper?: EquitySMACard;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 const REFRESH_INTERVAL = 5 * 60 * 1000;
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
+// ── Helpers ───────────────────────────────────────────────────────────────
 function fmt(val: number | null | undefined, decimals = 2, suffix = ""): string {
   if (val == null || isNaN(val)) return "–";
   return `${val.toFixed(decimals)}${suffix}`;
 }
-
 function fmtSigned(val: number | null | undefined, decimals = 2, suffix = ""): string {
   if (val == null || isNaN(val)) return "–";
   return `${val >= 0 ? "+" : ""}${val.toFixed(decimals)}${suffix}`;
 }
-
 function fmtLarge(val: number | null | undefined): string {
   if (val == null || isNaN(val)) return "–";
   return val.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
-
-function numColor(val: number | null | undefined, redWhenPositive = false): string {
-  if (val == null || isNaN(val)) return "text-slate-500";
-  const isPos = val > 0;
-  return (redWhenPositive ? isPos : !isPos) ? "text-red-400" : "text-green-400";
+function chgColor(val: number | null | undefined, redWhenPositive = false): string {
+  if (val == null || isNaN(val)) return "text-muted";
+  return (redWhenPositive ? val > 0 : val < 0) ? "text-alert-extreme" : "text-neutral-sage";
 }
 
 function PercentileBar({ value }: { value?: number | null }) {
-  if (value == null || isNaN(value)) return <span className="text-slate-600 font-mono text-xs">–</span>;
-  const color = value >= 80 ? "#E24B4A" : value >= 60 ? "#D9A84D" : value <= 20 ? "#7AB648" : "#4A4A4C";
+  if (value == null || isNaN(value)) return null;
+  const color = value >= 80 ? "#C4614A" : value >= 60 ? "#C89A3F" : value <= 20 ? "#8DA078" : "#55534B";
   return (
-    <div className="flex items-center gap-2 mt-1">
-      <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+    <div className="flex items-center gap-2 mt-1.5">
+      <div className="flex-1 h-[3px] bg-surface-inset rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${value}%`, background: color }} />
       </div>
-      <span className="font-mono text-xs" style={{ color }}>{value}th</span>
+      <span className="font-mono-data caps-sm" style={{ color }}>{value}th</span>
     </div>
   );
 }
 
-const ALERT_COLORS: Record<string, string> = {
-  "fear spike":              "text-red-400 bg-red-950 border-red-900",
-  "far below 200d":          "text-red-400 bg-red-950 border-red-900",
-  "tech volatility elevated":"text-red-400 bg-red-950 border-red-900",
-  "distress":                "text-red-400 bg-red-950 border-red-900",
-  "below 200d":              "text-orange-400 bg-orange-950 border-orange-900",
-  "tech volatility rising":  "text-orange-400 bg-orange-950 border-orange-900",
-  "elevated":                "text-amber-400 bg-amber-950 border-amber-900",
-  "well above 200d":         "text-green-400 bg-green-950 border-green-900",
-  "above 200d":              "text-green-400 bg-green-950 border-green-900",
-  "usd weakening":           "text-green-400 bg-green-950 border-green-900",
-};
-
 function Badge({ alert }: { alert?: string }) {
   if (!alert || alert === "–" || alert === "Normal") return null;
-  const key = alert.toLowerCase();
-  const cls = Object.entries(ALERT_COLORS).find(([k]) => key.includes(k))?.[1]
-    ?? "text-slate-400 bg-slate-900 border-slate-800";
-  return <span className={`inline-block text-xs font-mono border px-2 py-0.5 rounded ${cls}`}>{alert}</span>;
+  const lower = alert.toLowerCase();
+  const cls = lower.includes("high") || lower.includes("spike") || lower.includes("far below") || lower.includes("distress")
+    ? "bg-extreme-10 border-extreme text-alert-extreme"
+    : lower.includes("below") || lower.includes("stressed") || lower.includes("elevated")
+    ? "bg-notable-10 border-notable text-alert-notable"
+    : lower.includes("above") || lower.includes("sage") || lower.includes("calm") || lower.includes("weakening")
+    ? "bg-sage-10 border-sage text-neutral-sage"
+    : "bg-surface-2 hairline text-muted";
+  return <span className={`inline-block caps-sm border px-2 py-[3px] ${cls}`}>{alert}</span>;
 }
 
-function SectionLabel({ num, title }: { num: string; title: string }) {
+function SectionLabel({ numeral, title, subtitle }: { numeral: string; title: string; subtitle?: string }) {
   return (
-    <div className="flex items-center gap-3 mb-4">
-      <span className="font-mono text-xs border px-2 py-0.5 rounded" style={{ color: "#3A3228", background: "#1A1508", borderColor: "#3A3228" }}>{num}</span>
-      <span className="text-xs uppercase tracking-widest text-slate-600 font-medium">{title}</span>
+    <div className="flex items-end justify-between mb-5 hairline-b pb-3">
+      <div className="flex items-baseline gap-4">
+        <span className="font-display-italic text-amber-sand text-[28px] leading-none">{numeral}</span>
+        <h2 className="font-display text-paper text-[26px] leading-none">{title}</h2>
+      </div>
+      {subtitle && <span className="caps-sm text-faint">{subtitle}</span>}
     </div>
   );
 }
 
 // ── SMA Card ──────────────────────────────────────────────────────────────
-
-function SMAPriceCard({ title, data, unit = "" }: { title: string; data?: EquitySMACard; unit?: string }) {
-  if (!data) return <BlankCard title={title} msg="No data" />;
-  if (data.error && data.current == null) return <BlankCard title={title} msg={data.error} />;
+function SMAPriceCard({ title, data }: { title: string; data?: EquitySMACard }) {
+  if (!data) return <BlankCard title={title} />;
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-      <div className="flex items-start justify-between mb-3">
-        <div className="text-xs font-mono text-slate-600 uppercase tracking-widest">{title}</div>
+    <div className="bg-surface border hairline p-5">
+      <div className="flex items-start justify-between hairline-b pb-3 mb-3">
+        <span className="caps-sm text-faint">{title}</span>
         <Badge alert={data.alert} />
       </div>
-      <div className="font-mono text-3xl text-slate-100 mb-4">
-        {fmtLarge(data.current)}{data.current != null ? unit : ""}
-      </div>
-      <div className="space-y-2.5 text-sm border-t border-slate-900 pt-3">
+      <div className="font-mono-data text-paper text-[24px] leading-none mb-4">{fmtLarge(data.current)}</div>
+      <div className="space-y-2.5">
         {[
           { label: "20d SMA", sma: data.sma20, pct: data.pct_from_sma20 },
           { label: "50d SMA", sma: data.sma50, pct: data.pct_from_sma50 },
           { label: "200d SMA", sma: data.sma200, pct: data.pct_from_sma200 },
-        ].map(({ label, sma, pct }, i) => (
-          <div key={label} className={`flex justify-between items-center ${i === 2 ? "pb-2 border-b border-slate-900" : ""}`}>
+        ].map(({ label, sma, pct }) => (
+          <div key={label} className="flex justify-between items-baseline">
             <div>
-              <div className="text-slate-600 text-xs">{label}</div>
-              <div className="font-mono text-sm text-slate-400">{fmtLarge(sma)}</div>
+              <div className="caps-sm text-faint">{label}</div>
+              <div className="font-mono-data text-paper-2 text-[12px]">{fmtLarge(sma)}</div>
             </div>
-            <div className={`text-right font-mono text-sm ${numColor(pct)}`}>
+            <span className={`font-mono-data text-[13px] ${chgColor(pct)}`}>
               {fmtSigned(pct, 2, "%")}
-            </div>
+            </span>
           </div>
         ))}
-        <div className="flex justify-between items-center pt-2">
-          <span className="text-slate-600 text-xs">90d percentile</span>
-          <span className="font-mono text-xs text-slate-400">{data.percentile != null ? `${data.percentile}th` : "–"}</span>
-        </div>
       </div>
       <PercentileBar value={data.percentile} />
     </div>
   );
 }
 
-// ── Volatility Card (VIX, VXN, DXY) ──────────────────────────────────────
-
+// ── Volatility Card ───────────────────────────────────────────────────────
 function VolCard({ title, data, suffix = "" }: { title: string; data?: VolatilityCard; suffix?: string }) {
-  if (!data) return <BlankCard title={title} msg="No data" />;
+  if (!data) return <BlankCard title={title} />;
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-      <div className="flex items-start justify-between mb-3">
-        <div className="text-xs font-mono text-slate-600 uppercase tracking-widest">{title}</div>
+    <div className="bg-surface border hairline p-5">
+      <div className="flex items-start justify-between hairline-b pb-3 mb-3">
+        <span className="caps-sm text-faint">{title}</span>
         <Badge alert={data.alert} />
       </div>
-      <div className="font-mono text-3xl text-slate-100 mb-4">
-        {fmt(data.current, 2)}{suffix}
-      </div>
-      <div className="space-y-2 text-sm border-t border-slate-900 pt-3">
+      <div className="font-mono-data text-paper text-[24px] leading-none mb-4">{fmt(data.current, 2)}{suffix}</div>
+      <div className="space-y-2">
         <div className="flex justify-between items-baseline">
-          <span className="text-slate-600">5d chg</span>
-          <span className={`font-mono text-xs ${numColor(data.d5_chg, true)}`}>{fmtSigned(data.d5_chg)}</span>
+          <span className="caps-sm text-faint">5d chg</span>
+          <span className={`font-mono-data text-[12px] ${chgColor(data.d5_chg, true)}`}>{fmtSigned(data.d5_chg)}</span>
         </div>
         <div className="flex justify-between items-baseline">
-          <span className="text-slate-600">20d chg</span>
-          <span className={`font-mono text-xs ${numColor(data.d20_chg, true)}`}>{fmtSigned(data.d20_chg)}</span>
-        </div>
-        <div className="flex justify-between items-baseline">
-          <span className="text-slate-600">90d percentile</span>
-          <span className="font-mono text-xs text-slate-400">{data.percentile != null ? `${data.percentile}th` : "–"}</span>
+          <span className="caps-sm text-faint">20d chg</span>
+          <span className={`font-mono-data text-[12px] ${chgColor(data.d20_chg, true)}`}>{fmtSigned(data.d20_chg)}</span>
         </div>
       </div>
       <PercentileBar value={data.percentile} />
-      {data.pattern && <p className="text-xs text-slate-600 mt-3">{data.pattern}</p>}
+      {data.pattern && <p className="font-sans-body text-faint text-[11px] italic mt-3">{data.pattern}</p>}
     </div>
   );
 }
 
-function BlankCard({ title, msg }: { title: string; msg?: string }) {
+function BlankCard({ title }: { title: string }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-      <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-2">{title}</div>
-      <div className="text-sm text-slate-600 font-mono">{msg ?? "–"}</div>
+    <div className="bg-surface border hairline p-5">
+      <span className="caps-sm text-faint">{title}</span>
+      <div className="font-mono-data text-muted text-[13px] mt-3">No data</div>
     </div>
   );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────
-
 export default function MacroDashboard() {
   const [macro, setMacro] = useState<MacroMetrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -213,7 +197,7 @@ export default function MacroDashboard() {
   const fetchAll = useCallback(async () => {
     try {
       const res = await fetch(`${API}/macro/metrics`);
-      if (!res.ok) throw new Error(`Macro API ${res.status}`);
+      if (!res.ok) throw new Error(`API ${res.status}`);
       setMacro(await res.json());
       setLastUpdated(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }));
       setError(null);
@@ -224,15 +208,6 @@ export default function MacroDashboard() {
     }
   }, []);
 
-  const flushCache = async () => {
-  await Promise.all([
-    fetch(`${API}/cache/flush`),
-    fetch(`${API}/macro/cache/flush`),
-  ]);
-  localStorage.removeItem("btc_metrics_v1");
-  fetchAll();
-};
-  
   useEffect(() => {
     fetchAll();
     const t = setInterval(fetchAll, REFRESH_INTERVAL);
@@ -242,47 +217,51 @@ export default function MacroDashboard() {
   const TENORS = ["1y", "2y", "3y", "5y", "10y"] as const;
 
   return (
-    <main className="min-h-screen p-6" style={{ background: "#0B0B0C", color: "#E8E6E0", fontFamily: "'IBM Plex Sans', sans-serif" }}>
-      <div className="max-w-7xl mx-auto space-y-8">
+    <main className="bg-ink min-h-screen" style={{ fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+      <style>{FONT_LINK}</style>
 
-        {/* Header */}
-        <header className="flex items-center justify-between pb-4 border-b border-slate-900">
-          <div className="flex items-baseline gap-4">
-            <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 24, fontWeight: 400 }}>Macro Dashboard</h1>
-            <div className="flex items-center gap-1.5 text-xs font-mono text-slate-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-              {lastUpdated ? `Updated ${lastUpdated} UTC` : "Loading…"}
+      {/* Header */}
+      <header className="hairline-b">
+        <div className="max-w-[1440px] mx-auto px-8 py-5 flex items-center justify-between">
+          <div className="flex items-baseline gap-6">
+            <h1 className="font-display text-paper text-[30px] leading-none tracking-tight">
+              Macro<span className="font-display-italic text-amber-sand"> · </span><span className="font-display-italic">Dashboard</span>
+            </h1>
+            <span className="caps-sm text-faint hidden md:inline">AI organizes · humans decide</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <a href="/" className="caps-sm text-muted border hairline px-3 py-1.5 hover:text-paper transition-colors">BTC</a>
+            <a href="/sector-flows" className="caps-sm text-muted border hairline px-3 py-1.5 hover:text-paper transition-colors">Sector Flows</a>
+            <span className="caps-sm text-amber-sand border border-amber-sand bg-amber-sand-10 px-3 py-1.5">Macro</span>
+            <div className="flex items-center gap-1.5 pl-4 border-l hairline">
+              <div className="w-[7px] h-[7px] rounded-full bg-[#8DA078] pulse-dot" />
+              <span className="caps-sm text-neutral-sage">{lastUpdated ?? "Loading"}</span>
             </div>
           </div>
-          <nav className="flex gap-1">
-            <a href="/" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors">BTC</a>
-            <span className="text-xs px-3 py-1.5 rounded-md border font-mono" style={{ background: "#1C1C1E", color: "#D9A84D", borderColor: "#3A3228" }}>Macro</span>
-<button
-  onClick={flushCache}
-  className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-600 hover:text-slate-300 hover:border-slate-600 transition-colors font-mono"
->
-  ↺ flush cache
-</button>
-          </nav>
-        </header>
+        </div>
+      </header>
 
-        {error && (
-          <div className="rounded-lg border border-red-900 bg-red-950 px-4 py-3 text-sm text-red-400 font-mono">{error}</div>
-        )}
-        {loading && !macro && (
-          <div className="text-center py-20 text-slate-600 font-mono text-sm animate-pulse">Fetching macro data…</div>
-        )}
+      {error && (
+        <div className="max-w-[1440px] mx-auto px-8 py-3">
+          <div className="bg-extreme-10 border-extreme border px-4 py-2 caps-sm text-alert-extreme">{error}</div>
+        </div>
+      )}
+      {loading && !macro && (
+        <div className="max-w-[1440px] mx-auto px-8 py-20 text-center caps-sm text-faint">Fetching macro data…</div>
+      )}
+
+      <div className="max-w-[1440px] mx-auto px-8 py-8 space-y-12">
 
         {/* I. Treasury Yields */}
         {macro && (
           <section>
-            <SectionLabel num="I" title="US Treasury Yields" />
-            <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
-              <table className="w-full text-sm">
+            <SectionLabel numeral="I" title="US Treasury Yields" subtitle="yFinance · daily" />
+            <div className="bg-surface border hairline overflow-hidden">
+              <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-800">
+                  <tr className="hairline-b">
                     {["Tenor", "Yield", "1d chg", "5d chg", "52w range", "Signal"].map((h, i) => (
-                      <th key={h} className={`py-2.5 px-4 text-xs font-mono text-slate-600 uppercase tracking-wide font-normal ${i === 0 ? "text-left" : i < 4 ? "text-right" : i === 4 ? "" : "text-right"}`}>{h}</th>
+                      <th key={h} className={`px-5 py-3 caps-sm text-faint font-normal ${i === 0 ? "text-left" : i < 4 ? "text-right" : i === 5 ? "text-right" : ""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -290,23 +269,23 @@ export default function MacroDashboard() {
                   {TENORS.map((t, i) => {
                     const y: YieldTenor = macro.yields?.[t] ?? {};
                     return (
-                      <tr key={t} className={`border-b border-slate-900 hover:bg-slate-900 transition-colors ${i === TENORS.length - 1 ? "border-b-0" : ""}`}>
-                        <td className="px-4 py-3 font-mono text-slate-500 text-xs">{t.toUpperCase()}</td>
-                        <td className="px-4 py-3 font-mono text-right text-base text-slate-100">{fmt(y.current, 2, "%")}</td>
-                        <td className={`px-4 py-3 font-mono text-right text-xs ${numColor(y.d1_chg)}`}>{fmtSigned(y.d1_chg, 3)}</td>
-                        <td className={`px-4 py-3 font-mono text-right text-xs ${numColor(y.d5_chg)}`}>{fmtSigned(y.d5_chg, 3)}</td>
-                        <td className="px-4 py-3"><PercentileBar value={y.percentile} /></td>
-                        <td className="px-4 py-3 text-right"><Badge alert={y.alert} /></td>
+                      <tr key={t} className={`hover:bg-surface-2 transition-colors ${i < TENORS.length - 1 ? "hairline-b" : ""}`}>
+                        <td className="px-5 py-3 font-mono-data caps-sm text-faint">{t.toUpperCase()}</td>
+                        <td className="px-5 py-3 font-mono-data text-paper text-right text-[15px]">{fmt(y.current, 2, "%")}</td>
+                        <td className={`px-5 py-3 font-mono-data text-right text-[12px] ${chgColor(y.d1_chg)}`}>{fmtSigned(y.d1_chg, 3)}</td>
+                        <td className={`px-5 py-3 font-mono-data text-right text-[12px] ${chgColor(y.d5_chg)}`}>{fmtSigned(y.d5_chg, 3)}</td>
+                        <td className="px-5 py-3 w-36"><PercentileBar value={y.percentile} /></td>
+                        <td className="px-5 py-3 text-right"><Badge alert={y.alert} /></td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-              <div className="px-4 py-3 border-t border-slate-800 flex items-center gap-6 text-xs text-slate-600">
-                <span>2Y–10Y spread: <span className="font-mono" style={{ color: "#D9A84D" }}>
+              <div className="px-5 py-3 hairline-t bg-surface-inset flex items-center gap-6 caps-sm text-faint">
+                <span>2Y–10Y spread: <span className="text-amber-sand font-mono-data">
                   {macro.curve?.spread_2y10y_bp != null ? `${macro.curve.spread_2y10y_bp >= 0 ? "+" : ""}${macro.curve.spread_2y10y_bp}bp` : "–"}
                 </span></span>
-                <span>Curve: <span style={{ color: "#D9A84D" }}>{macro.curve?.label ?? "–"}</span></span>
+                <span>Curve: <span className="text-amber-sand">{macro.curve?.label ?? "–"}</span></span>
               </div>
             </div>
           </section>
@@ -315,29 +294,29 @@ export default function MacroDashboard() {
         {/* II. Risk Indicators */}
         {macro && (
           <section>
-            <SectionLabel num="II" title="Risk Indicators" />
+            <SectionLabel numeral="II" title="Risk Indicators" />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <VolCard title="DXY Dollar Index" data={macro.dxy} />
               <VolCard title="VIX Volatility" data={macro.vix} />
-              <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="text-xs font-mono text-slate-600 uppercase tracking-widest">HY Credit Spread</div>
+              <div className="bg-surface border hairline p-5">
+                <div className="flex items-start justify-between hairline-b pb-3 mb-3">
+                  <span className="caps-sm text-faint">HY Credit Spread</span>
                   <Badge alert={macro.hy_oas?.alert} />
                 </div>
-                <div className="font-mono text-3xl text-slate-100 mb-4">
+                <div className="font-mono-data text-paper text-[24px] leading-none mb-4">
                   {macro.hy_oas?.current != null ? `${fmt(macro.hy_oas.current, 2)}%` : "–"}
                 </div>
-                <div className="space-y-2 text-sm border-t border-slate-900 pt-3">
+                <div className="space-y-2">
                   <div className="flex justify-between items-baseline">
-                    <span className="text-slate-600">5d chg</span>
-                    <span className={`font-mono text-xs ${numColor(macro.hy_oas?.d5_chg, true)}`}>
-                      {macro.hy_oas?.d5_chg != null ? `${fmtSigned(macro.hy_oas.d5_chg, 2)}%` : "–"}
+                    <span className="caps-sm text-faint">5d chg</span>
+                    <span className={`font-mono-data text-[12px] ${chgColor(macro.hy_oas?.d5_chg, true)}`}>
+                      {macro.hy_oas?.d5_chg != null ? fmtSigned(macro.hy_oas.d5_chg, 2, "%") : "–"}
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
-                    <span className="text-slate-600">20d chg</span>
-                    <span className={`font-mono text-xs ${numColor(macro.hy_oas?.d20_chg, true)}`}>
-                      {macro.hy_oas?.d20_chg != null ? `${fmtSigned(macro.hy_oas.d20_chg, 2)}%` : "–"}
+                    <span className="caps-sm text-faint">20d chg</span>
+                    <span className={`font-mono-data text-[12px] ${chgColor(macro.hy_oas?.d20_chg, true)}`}>
+                      {macro.hy_oas?.d20_chg != null ? fmtSigned(macro.hy_oas.d20_chg, 2, "%") : "–"}
                     </span>
                   </div>
                 </div>
@@ -350,22 +329,21 @@ export default function MacroDashboard() {
         {/* III. Equities & Commodities */}
         {macro && (
           <section>
-            <SectionLabel num="III" title="Equities & Commodities — SMA Analysis" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SectionLabel numeral="III" title="Equities & Commodities" subtitle="SMA analysis" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <SMAPriceCard title="Nasdaq-100" data={macro.nasdaq100} />
-              <VolCard title="VXN (Nasdaq Vol)" data={macro.vxn} />
+              <VolCard title="VXN — Nasdaq Vol" data={macro.vxn} />
               <SMAPriceCard title="S&P 500" data={macro.sp500} />
               <SMAPriceCard title="Brent Crude Oil" data={macro.brent} />
             </div>
           </section>
         )}
 
-
         {/* IV. Metals */}
         {macro && (
           <section>
-            <SectionLabel num="IV" title="Metals — SMA Analysis" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SectionLabel numeral="IV" title="Metals" subtitle="SMA analysis" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <SMAPriceCard title="Gold" data={macro.gold} />
               <SMAPriceCard title="Silver" data={macro.silver} />
               <SMAPriceCard title="Platinum" data={macro.platinum} />
@@ -374,12 +352,11 @@ export default function MacroDashboard() {
           </section>
         )}
 
-        <footer className="pt-4 border-t border-slate-900 text-xs text-slate-700 font-mono flex items-center gap-4">
-          <span>Data: yFinance · FRED (HY OAS) · 5min cache</span>
-          <span>·</span>
-          <span>AI organizes reality. Humans make decisions.</span>
-        </footer>
       </div>
+
+      <footer className="max-w-[1440px] mx-auto px-8 py-6 hairline-t">
+        <span className="caps-sm text-faint">Data: yFinance · FRED (HY OAS) · 5min cache · AI organizes reality. Humans make decisions.</span>
+      </footer>
     </main>
   );
 }
