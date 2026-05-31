@@ -942,10 +942,12 @@ const Header = ({ price, change24h, onFlushCache, flushing }: {
         <span className="caps-sm text-faint hidden md:inline">AI organizes · humans decide</span>
       </div>
       <div className="flex items-center gap-6">
-        <a href="/macro" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300">Macro</a>
+        <nav className="flex items-center gap-1">
+          <a href="/macro" className="caps-sm text-muted border hairline px-3 py-1.5 hover:text-paper transition-colors">Macro</a>
+          <a href="/sector-flows" className="caps-sm text-muted border hairline px-3 py-1.5 hover:text-paper transition-colors">Sector Flows</a>
+        </nav>
         <div className="text-right"><div className="caps-sm text-faint">Spot</div><div className="font-mono-data text-paper text-[15px]">{price} <span className={`text-[12px] ${change24h.startsWith("+") ? "text-neutral-sage" : "text-alert-extreme"}`}>{change24h}</span></div></div>
         <div className="text-right hidden sm:block"><div className="caps-sm text-faint">Snapshot</div><div className="font-mono-data text-paper-2 text-[12px]" suppressHydrationWarning>{new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" })}</div></div>
-        {/* Flush cache button */}
         <button
           onClick={onFlushCache}
           disabled={flushing}
