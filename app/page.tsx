@@ -931,7 +931,7 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
 
 const Header = ({ price, change24h, onFlushCache, flushing }: { 
   price: string; 
-  change24h={price.change_24h ?? "+"} 
+  change24h={price.change_24h ?? "+"}; 
   onFlushCache: () => void;
   flushing: boolean;
 }) => (
