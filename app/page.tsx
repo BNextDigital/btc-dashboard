@@ -952,7 +952,7 @@ const Header = ({ price, change24h, onFlushCache, flushing }: {
           onClick={onFlushCache}
           disabled={flushing}
           className="caps-sm text-faint hover:text-paper transition-colors disabled:opacity-40"
-        >
+       >
           {flushing ? "flushing…" : "↺ flush"}
         </button>
         <div className="flex items-center gap-1.5 pl-4 border-l hairline"><Circle size={7} fill="#8DA078" stroke="none" className="pulse-dot" /><span className="caps-sm text-neutral-sage">Live</span></div>
