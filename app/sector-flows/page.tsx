@@ -2,18 +2,47 @@
 
 import { useEffect, useState, useCallback } from "react";
 
+const FONT_LINK = `
+  @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+  .font-display { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
+  .font-display-italic { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; }
+  .font-sans-body { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+  .font-mono-data { font-family: 'IBM Plex Mono', 'Courier New', monospace; font-feature-settings: 'tnum'; }
+  .hairline { border-color: #22231F; }
+  .hairline-b { border-bottom: 1px solid #22231F; }
+  .hairline-t { border-top: 1px solid #22231F; }
+  .caps-sm { letter-spacing: 0.22em; text-transform: uppercase; font-size: 9px; font-weight: 500; }
+  .bg-ink { background-color: #0B0B0C; }
+  .bg-surface { background-color: #131315; }
+  .bg-surface-2 { background-color: #17171A; }
+  .bg-surface-inset { background-color: #0E0E10; }
+  .text-paper { color: #E8E4D9; }
+  .text-paper-2 { color: #B8B5AA; }
+  .text-muted { color: #8A8780; }
+  .text-faint { color: #55534B; }
+  .text-amber-sand { color: #D9A84D; }
+  .text-alert-extreme { color: #C4614A; }
+  .text-alert-notable { color: #C89A3F; }
+  .text-neutral-sage { color: #8DA078; }
+  .bg-amber-sand-10 { background-color: rgba(217,168,77,0.10); }
+  .bg-extreme-10 { background-color: rgba(196,97,74,0.10); }
+  .bg-notable-10 { background-color: rgba(200,154,63,0.10); }
+  .bg-sage-10 { background-color: rgba(141,160,120,0.10); }
+  .border-extreme { border-color: rgba(196,97,74,0.35); }
+  .border-notable { border-color: rgba(200,154,63,0.35); }
+  .border-sage { border-color: rgba(141,160,120,0.35); }
+  .border-amber-sand { border-color: rgba(217,168,77,0.35); }
+  .pulse-dot { animation: pulse-soft 2.4s ease-in-out infinite; }
+  @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+`;
+
 interface SectorFlowMetric {
-  name: string;
-  ticker: string;
-  current?: number | null;
-  change_5d?: number | null;
-  mfi?: number | null;
-  obv?: number | null;
-  volume_momentum?: number | null;
-  relative_performance?: number | null;
+  name: string; ticker: string;
+  current?: number | null; change_5d?: number | null;
+  mfi?: number | null; obv?: number | null;
+  volume_momentum?: number | null; relative_performance?: number | null;
   flow_signal?: string;
 }
-
 interface SectorFlowResponse {
   updated_at: string;
   sectors: Record<string, SectorFlowMetric>;
@@ -21,114 +50,113 @@ interface SectorFlowResponse {
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 const REFRESH_INTERVAL = 5 * 60 * 1000;
-
-// ── Helpers ────────────────────────────────────────────────────────────────
+const SECTOR_ORDER = ["equities", "tech", "financials", "energy", "realestate", "metals", "crypto", "bonds"];
 
 function fmt(val: number | null | undefined, decimals = 2): string {
   if (val == null || isNaN(val)) return "–";
   return val.toFixed(decimals);
 }
-
-function flowColor(signal?: string): string {
-  if (!signal) return "text-slate-500";
-  if (signal.includes("Inflow")) return "text-green-400";
-  if (signal.includes("Outflow")) return "text-red-400";
-  return "text-slate-400";
+function fmtSigned(val: number | null | undefined, decimals = 1, suffix = ""): string {
+  if (val == null || isNaN(val)) return "–";
+  return `${val >= 0 ? "+" : ""}${val.toFixed(decimals)}${suffix}`;
 }
 
-function mfiColor(val?: number | null): string {
-  if (val == null) return "text-slate-500";
-  if (val > 70) return "text-red-400";      // overbought, selling
-  if (val > 60) return "text-orange-400";   // strong selling
-  if (val < 30) return "text-green-400";    // oversold, buying
-  if (val < 40) return "text-emerald-400";  // buying
-  return "text-slate-400";                  // neutral
-}
-
-function obvColor(val?: number | null): string {
-  if (val == null) return "text-slate-500";
-  if (val > 50) return "text-green-400";    // strong accumulation
-  if (val > 0) return "text-emerald-400";   // accumulation
-  if (val < -50) return "text-red-400";     // strong distribution
-  if (val < 0) return "text-orange-400";    // distribution
-  return "text-slate-400";
-}
-
-function volMomColor(val?: number | null): string {
-  if (val == null) return "text-slate-500";
-  if (val > 1.5) return "text-green-400";   // massive inflow
-  if (val > 1.0) return "text-emerald-400"; // inflow
-  if (val < 0.8) return "text-red-400";     // outflow
-  return "text-slate-400";
-}
-
-function SectionLabel({ num, title }: { num: string; title: string }) {
+function SectionLabel({ numeral, title, subtitle }: { numeral: string; title: string; subtitle?: string }) {
   return (
-    <div className="flex items-center gap-3 mb-4">
-      <span className="font-mono text-xs border px-2 py-0.5 rounded" style={{ color: "#3A3228", background: "#1A1508", borderColor: "#3A3228" }}>
-        {num}
-      </span>
-      <span className="text-xs uppercase tracking-widest text-slate-600 font-medium">{title}</span>
+    <div className="flex items-end justify-between mb-5 hairline-b pb-3">
+      <div className="flex items-baseline gap-4">
+        <span className="font-display-italic text-amber-sand text-[28px] leading-none">{numeral}</span>
+        <h2 className="font-display text-paper text-[26px] leading-none">{title}</h2>
+      </div>
+      {subtitle && <span className="caps-sm text-faint">{subtitle}</span>}
     </div>
   );
 }
 
-// ── Sector Flow Matrix Card ────────────────────────────────────────────────
+function flowSignalStyle(signal?: string): string {
+  if (!signal) return "bg-surface-2 hairline text-muted";
+  const s = signal.toLowerCase();
+  if (s.includes("heavy inflow") || s.includes("strong inflow")) return "bg-sage-10 border-sage text-neutral-sage";
+  if (s.includes("heavy outflow") || s.includes("weak outflow")) return "bg-extreme-10 border-extreme text-alert-extreme";
+  return "bg-surface-2 hairline text-muted";
+}
 
-function SectorFlowCard({ sector }: { sector: SectorFlowMetric }) {
+function mfiColor(val?: number | null): string {
+  if (val == null) return "text-muted";
+  if (val > 70) return "text-alert-extreme";
+  if (val > 60) return "text-alert-notable";
+  if (val < 30) return "text-neutral-sage";
+  if (val < 40) return "text-neutral-sage";
+  return "text-paper-2";
+}
+function obvColor(val?: number | null): string {
+  if (val == null) return "text-muted";
+  if (val > 30) return "text-neutral-sage";
+  if (val < -30) return "text-alert-extreme";
+  return "text-paper-2";
+}
+function volMomColor(val?: number | null): string {
+  if (val == null) return "text-muted";
+  if (val > 1.2) return "text-neutral-sage";
+  if (val < 0.8) return "text-alert-extreme";
+  return "text-paper-2";
+}
+
+// Heatmap cell color using BTC palette
+function heatColor(val: number | null): string {
+  if (val == null) return "#22231F";
+  if (val > 60) return "#6B1F1A";   // extreme red
+  if (val > 30) return "#5A3A10";   // notable amber
+  if (val > 0) return "#1C1C1E";    // neutral dark
+  if (val > -30) return "#152415";  // subtle green
+  if (val > -60) return "#1A3322";  // green
+  return "#0F2B1C";                 // strong green
+}
+function heatTextColor(val: number | null): string {
+  if (val == null) return "#55534B";
+  if (val > 60) return "#C4614A";
+  if (val > 30) return "#C89A3F";
+  if (val > -30) return "#8A8780";
+  return "#8DA078";
+}
+
+function SectorCard({ sector }: { sector: SectorFlowMetric }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950 p-5 space-y-3">
-      <div className="flex items-start justify-between">
+    <div className="bg-surface border hairline p-5">
+      <div className="flex items-start justify-between hairline-b pb-3 mb-3">
         <div>
-          <div className="text-xs font-mono text-slate-600 uppercase tracking-widest">{sector.name}</div>
-          <div className="text-sm font-mono text-slate-500">{sector.ticker}</div>
+          <div className="caps-sm text-faint">{sector.name}</div>
+          <div className="font-mono-data text-muted text-[11px] mt-0.5">{sector.ticker}</div>
         </div>
         <div className="text-right">
-          <div className="font-mono text-lg text-slate-100">{fmt(sector.current, 2)}</div>
-          <div className={`font-mono text-xs ${sector.change_5d && sector.change_5d >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {sector.change_5d != null ? `${sector.change_5d >= 0 ? "+" : ""}${fmt(sector.change_5d, 1)}%` : "–"}
+          <div className="font-mono-data text-paper text-[15px]">{fmt(sector.current, 2)}</div>
+          <div className={`font-mono-data text-[11px] ${sector.change_5d != null && sector.change_5d >= 0 ? "text-neutral-sage" : "text-alert-extreme"}`}>
+            {fmtSigned(sector.change_5d, 1, "%")}
           </div>
         </div>
       </div>
 
-      {/* Flow Signal Badge */}
-      <div className="pt-2 border-t border-slate-900">
-        <div className={`inline-block text-xs font-mono border px-2 py-1 rounded ${flowColor(sector.flow_signal)} border-current opacity-50`}>
-          {sector.flow_signal ?? "–"}
-        </div>
+      <div className={`inline-block caps-sm border px-2 py-[3px] mb-3 ${flowSignalStyle(sector.flow_signal)}`}>
+        {sector.flow_signal ?? "–"}
       </div>
 
-      {/* Metrics Grid */}
-      <div className="space-y-2 text-xs">
-        {/* MFI */}
+      <div className="space-y-2">
         <div className="flex justify-between items-baseline">
-          <span className="text-slate-600">MFI (14)</span>
-          <span className={`font-mono ${mfiColor(sector.mfi)}`}>
-            {fmt(sector.mfi, 0)}
-          </span>
+          <span className="caps-sm text-faint">MFI (14)</span>
+          <span className={`font-mono-data text-[12px] ${mfiColor(sector.mfi)}`}>{fmt(sector.mfi, 0)}</span>
         </div>
-
-        {/* OBV */}
         <div className="flex justify-between items-baseline">
-          <span className="text-slate-600">OBV trend</span>
-          <span className={`font-mono ${obvColor(sector.obv)}`}>
-            {fmt(sector.obv, 0)}
-          </span>
+          <span className="caps-sm text-faint">OBV trend</span>
+          <span className={`font-mono-data text-[12px] ${obvColor(sector.obv)}`}>{fmt(sector.obv, 0)}</span>
         </div>
-
-        {/* Volume Momentum */}
         <div className="flex justify-between items-baseline">
-          <span className="text-slate-600">Vol momentum</span>
-          <span className={`font-mono ${volMomColor(sector.volume_momentum)}`}>
-            {fmt(sector.volume_momentum, 2)}x
-          </span>
+          <span className="caps-sm text-faint">Vol momentum</span>
+          <span className={`font-mono-data text-[12px] ${volMomColor(sector.volume_momentum)}`}>{fmt(sector.volume_momentum, 2)}x</span>
         </div>
-
-        {/* Relative Performance */}
-        <div className="flex justify-between items-baseline pt-1 border-t border-slate-900">
-          <span className="text-slate-600">vs S&P 500 (5d)</span>
-          <span className={`font-mono ${sector.relative_performance && sector.relative_performance >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {sector.relative_performance != null ? `${sector.relative_performance >= 0 ? "+" : ""}${fmt(sector.relative_performance, 1)}%` : "–"}
+        <div className="flex justify-between items-baseline hairline-t pt-2">
+          <span className="caps-sm text-faint">vs S&P 500 (5d)</span>
+          <span className={`font-mono-data text-[12px] ${sector.relative_performance != null && sector.relative_performance >= 0 ? "text-neutral-sage" : "text-alert-extreme"}`}>
+            {fmtSigned(sector.relative_performance, 1, "%")}
           </span>
         </div>
       </div>
@@ -136,69 +164,61 @@ function SectorFlowCard({ sector }: { sector: SectorFlowMetric }) {
   );
 }
 
-// ── Flow Matrix Heatmap ────────────────────────────────────────────────────
-
-function FlowMatrixHeatmap({ sectors }: { sectors: Record<string, SectorFlowMetric> }) {
-  const order = ["equities", "tech", "financials", "energy", "realestate", "metals", "crypto", "bonds"];
-  
-  // Normalize metrics to -100 to +100 for heatmap
-  const normalize = (val: number | null | undefined, metric: string): number | null => {
+function FlowHeatmap({ sectors }: { sectors: Record<string, SectorFlowMetric> }) {
+  const norm = (val: number | null | undefined, metric: string): number | null => {
     if (val == null) return null;
-    
-    switch (metric) {
-      case "mfi": return (val - 50) * 2;     // 0-100 → -100 to +100
-      case "obv": return val;                 // already -100 to +100
-      case "vol_mom": return (val - 1) * 100; // 0.5-1.5 → -50 to +50
-      default: return val;
-    }
-  };
-  
-  const getHeatmapColor = (val: number | null): string => {
-    if (val == null) return "#4A4A4C";
-    if (val > 60) return "#E24B4A";   // strong red (selling/outflow)
-    if (val > 30) return "#D9A84D";   // amber (moderate selling)
-    if (val > 0) return "#8B8B8C";    // neutral red
-    if (val > -30) return "#8B8B8C";  // neutral green
-    if (val > -60) return "#7AB648";  // green (buying/inflow)
-    return "#2D7A3E";                 // strong green
+    if (metric === "mfi") return (val - 50) * 2;
+    if (metric === "obv") return val;
+    if (metric === "vm") return (val - 1) * 100;
+    return val;
   };
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950 p-5 overflow-x-auto">
-      <table className="w-full text-xs font-mono">
+    <div className="bg-surface border hairline overflow-hidden">
+      <table className="w-full">
         <thead>
-          <tr className="border-b border-slate-800">
-            <th className="text-left px-3 py-2 text-slate-600">Sector</th>
-            <th className="text-center px-2 py-2 text-slate-600">MFI</th>
-            <th className="text-center px-2 py-2 text-slate-600">OBV</th>
-            <th className="text-center px-2 py-2 text-slate-600">Vol Mom</th>
+          <tr className="hairline-b bg-surface-inset">
+            <th className="text-left px-5 py-3 caps-sm text-faint font-normal">Sector</th>
+            <th className="text-center px-4 py-3 caps-sm text-faint font-normal">MFI</th>
+            <th className="text-center px-4 py-3 caps-sm text-faint font-normal">OBV</th>
+            <th className="text-center px-4 py-3 caps-sm text-faint font-normal">Vol Momentum</th>
+            <th className="text-right px-5 py-3 caps-sm text-faint font-normal">Flow Signal</th>
           </tr>
         </thead>
         <tbody>
-          {order.map((key) => {
+          {SECTOR_ORDER.map((key) => {
             const s = sectors[key];
             if (!s) return null;
-            
-            const mfi_norm = normalize(s.mfi, "mfi");
-            const obv_norm = normalize(s.obv, "obv");
-            const vm_norm = normalize(s.volume_momentum, "vol_mom");
-            
+            const mfi_n = norm(s.mfi, "mfi");
+            const obv_n = norm(s.obv, "obv");
+            const vm_n = norm(s.volume_momentum, "vm");
             return (
-              <tr key={key} className="border-b border-slate-900 hover:bg-slate-900 transition-colors">
-                <td className="px-3 py-2 text-slate-400">{s.name}</td>
-                <td className="px-2 py-2 text-center">
-                  <span style={{ background: getHeatmapColor(mfi_norm), color: "#fff", padding: "2px 6px", borderRadius: "3px", display: "inline-block" }}>
+              <tr key={key} className="hairline-b hover:bg-surface-2 transition-colors last:border-0">
+                <td className="px-5 py-3">
+                  <div className="font-sans-body text-paper-2 text-[13px]">{s.name}</div>
+                  <div className="font-mono-data text-faint text-[10px]">{s.ticker}</div>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className="font-mono-data text-[12px] px-2 py-0.5 rounded-sm"
+                    style={{ background: heatColor(mfi_n), color: heatTextColor(mfi_n) }}>
                     {fmt(s.mfi, 0)}
                   </span>
                 </td>
-                <td className="px-2 py-2 text-center">
-                  <span style={{ background: getHeatmapColor(obv_norm), color: "#fff", padding: "2px 6px", borderRadius: "3px", display: "inline-block" }}>
+                <td className="px-4 py-3 text-center">
+                  <span className="font-mono-data text-[12px] px-2 py-0.5 rounded-sm"
+                    style={{ background: heatColor(obv_n), color: heatTextColor(obv_n) }}>
                     {fmt(s.obv, 0)}
                   </span>
                 </td>
-                <td className="px-2 py-2 text-center">
-                  <span style={{ background: getHeatmapColor(vm_norm), color: "#fff", padding: "2px 6px", borderRadius: "3px", display: "inline-block" }}>
+                <td className="px-4 py-3 text-center">
+                  <span className="font-mono-data text-[12px] px-2 py-0.5 rounded-sm"
+                    style={{ background: heatColor(vm_n), color: heatTextColor(vm_n) }}>
                     {fmt(s.volume_momentum, 2)}x
+                  </span>
+                </td>
+                <td className="px-5 py-3 text-right">
+                  <span className={`inline-block caps-sm border px-2 py-[3px] ${flowSignalStyle(s.flow_signal)}`}>
+                    {s.flow_signal ?? "–"}
                   </span>
                 </td>
               </tr>
@@ -206,26 +226,14 @@ function FlowMatrixHeatmap({ sectors }: { sectors: Record<string, SectorFlowMetr
           })}
         </tbody>
       </table>
-      
-      <div className="mt-4 text-xs text-slate-600 flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="w-4 h-4 rounded" style={{ background: "#E24B4A" }} />
-          <span>Heavy selling / Outflow</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-4 h-4 rounded" style={{ background: "#D9A84D" }} />
-          <span>Moderate</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-4 h-4 rounded" style={{ background: "#7AB648" }} />
-          <span>Heavy buying / Inflow</span>
-        </div>
+      <div className="px-5 py-3 hairline-t bg-surface-inset flex items-center gap-6 caps-sm text-faint">
+        <span><span style={{ color: "#C4614A" }}>■</span> Heavy selling / Outflow</span>
+        <span><span style={{ color: "#C89A3F" }}>■</span> Moderate</span>
+        <span><span style={{ color: "#8DA078" }}>■</span> Heavy buying / Inflow</span>
       </div>
     </div>
   );
 }
-
-// ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function SectorCapitalFlowMatrix() {
   const [data, setData] = useState<SectorFlowResponse | null>(null);
@@ -254,94 +262,98 @@ export default function SectorCapitalFlowMatrix() {
   }, [fetchData]);
 
   return (
-    <main className="min-h-screen p-6" style={{ background: "#0B0B0C", color: "#E8E6E0", fontFamily: "'IBM Plex Sans', sans-serif" }}>
-      <div className="max-w-7xl mx-auto space-y-8">
+    <main className="bg-ink min-h-screen" style={{ fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+      <style>{FONT_LINK}</style>
 
-        {/* Header */}
-        <header className="flex items-center justify-between pb-4 border-b border-slate-900">
-          <div className="flex items-baseline gap-4">
-            <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 24, fontWeight: 400 }}>
-              Sector Capital Flow Matrix
+      {/* Header */}
+      <header className="hairline-b">
+        <div className="max-w-[1440px] mx-auto px-8 py-5 flex items-center justify-between">
+          <div className="flex items-baseline gap-6">
+            <h1 className="font-display text-paper text-[30px] leading-none tracking-tight">
+              Sector<span className="font-display-italic text-amber-sand"> · </span><span className="font-display-italic">Capital Flow Matrix</span>
             </h1>
-            <div className="flex items-center gap-1.5 text-xs font-mono text-slate-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-              {lastUpdated ? `Updated ${lastUpdated} UTC` : "Loading…"}
+            <span className="caps-sm text-faint hidden md:inline">AI organizes · humans decide</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <a href="/" className="caps-sm text-muted border hairline px-3 py-1.5 hover:text-paper transition-colors">BTC</a>
+            <a href="/macro" className="caps-sm text-muted border hairline px-3 py-1.5 hover:text-paper transition-colors">Macro</a>
+            <span className="caps-sm text-amber-sand border border-amber-sand bg-amber-sand-10 px-3 py-1.5">Sector Flows</span>
+            <div className="flex items-center gap-1.5 pl-4 border-l hairline">
+              <div className="w-[7px] h-[7px] rounded-full bg-[#8DA078] pulse-dot" />
+              <span className="caps-sm text-neutral-sage">{lastUpdated ?? "Loading"}</span>
             </div>
           </div>
+        </div>
+      </header>
 
-          <nav className="flex gap-1">
-            <a href="/" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors">BTC</a>
-            <a href="/macro" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors">Macro</a>
-            <span className="text-xs px-3 py-1.5 rounded-md border font-mono" style={{ background: "#1C1C1E", color: "#D9A84D", borderColor: "#3A3228" }}>
-              Sector Flows
-            </span>
-          </nav>
-        </header>
+      {error && (
+        <div className="max-w-[1440px] mx-auto px-8 py-3">
+          <div className="bg-extreme-10 border-extreme border px-4 py-2 caps-sm text-alert-extreme">{error}</div>
+        </div>
+      )}
+      {loading && !data && (
+        <div className="max-w-[1440px] mx-auto px-8 py-20 text-center caps-sm text-faint">Analyzing sector flows…</div>
+      )}
 
-        {error && (
-          <div className="rounded-lg border border-red-900 bg-red-950 px-4 py-3 text-sm text-red-400 font-mono">{error}</div>
-        )}
-        {loading && !data && (
-          <div className="text-center py-20 text-slate-600 font-mono text-sm animate-pulse">Analyzing sector flows…</div>
-        )}
+      <div className="max-w-[1440px] mx-auto px-8 py-8 space-y-12">
 
-        {/* I. Flow Matrix Heatmap */}
+        {/* I. Heatmap */}
         {data && (
           <section>
-            <SectionLabel num="I" title="Sector Flow Matrix (Heatmap)" />
-            <FlowMatrixHeatmap sectors={data.sectors} />
-            <p className="text-xs text-slate-600 mt-3">
-              <strong>MFI:</strong> Money Flow Index (0–100). &gt;70 = overbought (heavy selling), &lt;30 = oversold (heavy buying). 
-              <strong className="ml-4">OBV:</strong> On-Balance Volume trend (-100 to +100). Positive = net accumulation, negative = net distribution.
-              <strong className="ml-4">Vol Mom:</strong> Volume momentum (5d avg / 20d avg). &gt;1.2 = strong inflow, &lt;0.8 = capital drying up.
-            </p>
+            <SectionLabel numeral="I" title="Flow Matrix" subtitle="MFI · OBV · Volume momentum" />
+            <FlowHeatmap sectors={data.sectors} />
+            <div className="mt-3 flex flex-wrap gap-6 caps-sm text-faint">
+              <span><span className="text-paper-2">MFI</span> — Money Flow Index (0–100). &gt;70 = overbought, &lt;30 = oversold</span>
+              <span><span className="text-paper-2">OBV</span> — On-Balance Volume (-100 to +100). Positive = accumulation</span>
+              <span><span className="text-paper-2">Vol Momentum</span> — 5d avg vol / 20d avg vol. &gt;1.2 = inflow, &lt;0.8 = drying up</span>
+            </div>
           </section>
         )}
 
-        {/* II. Detailed Sector Cards */}
+        {/* II. Sector Cards */}
         {data && (
           <section>
-            <SectionLabel num="II" title="Sector Details" />
+            <SectionLabel numeral="II" title="Sector Detail" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {["equities", "tech", "financials", "energy", "realestate", "metals", "crypto", "bonds"].map((key) => {
+              {SECTOR_ORDER.map((key) => {
                 const s = data.sectors[key];
-                return s ? <SectorFlowCard key={key} sector={s} /> : null;
+                return s ? <SectorCard key={key} sector={s} /> : null;
               })}
             </div>
           </section>
         )}
 
-        {/* III. Interpretation Guide */}
-        <section className="rounded-xl border border-slate-800 bg-slate-950 p-6">
-          <SectionLabel num="III" title="Flow Interpretation" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-slate-400">
+        {/* III. Interpretation */}
+        <section>
+          <SectionLabel numeral="III" title="Rotation Thesis" />
+          <div className="bg-surface border hairline p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <div className="text-xs font-mono text-slate-600 uppercase mb-2">Flow Signals</div>
-              <ul className="space-y-1 text-xs">
-                <li><span className="text-green-400">Heavy Inflow</span> — MFI &gt;70 + Vol Mom &gt;1.2 (capital rushing in)</li>
-                <li><span className="text-green-400">Strong Inflow</span> — MFI &gt;60 + Vol Mom &gt;1.0 (sustained buying)</li>
-                <li><span className="text-red-400">Heavy Outflow</span> — MFI &lt;30 + Vol Mom &lt;0.8 (capital fleeing)</li>
-                <li><span className="text-red-400">Weak Outflow</span> — MFI &lt;40 + Vol Mom &lt;1.0 (gradual selling)</li>
-                <li><span className="text-slate-400">Stable</span> — Mixed signals or neutral zone</li>
-              </ul>
+              <div className="caps-sm text-faint mb-3">Flow Signals</div>
+              <div className="space-y-2 font-sans-body text-[12px]">
+                <div><span className="text-neutral-sage">Heavy Inflow</span> <span className="text-muted">— MFI &gt;70 + Vol Mom &gt;1.2 (capital rushing in)</span></div>
+                <div><span className="text-neutral-sage">Strong Inflow</span> <span className="text-muted">— MFI &gt;60 + Vol Mom &gt;1.0 (sustained buying)</span></div>
+                <div><span className="text-alert-extreme">Heavy Outflow</span> <span className="text-muted">— MFI &lt;30 + Vol Mom &lt;0.8 (capital fleeing)</span></div>
+                <div><span className="text-alert-extreme">Weak Outflow</span> <span className="text-muted">— MFI &lt;40 + Vol Mom &lt;1.0 (gradual selling)</span></div>
+                <div><span className="text-paper-2">Stable</span> <span className="text-muted">— Mixed or neutral signals</span></div>
+              </div>
             </div>
             <div>
-              <div className="text-xs font-mono text-slate-600 uppercase mb-2">Rotation Thesis</div>
-              <ul className="space-y-1 text-xs">
-                <li>🟢 <span className="text-green-400">Metals inflow + Energy outflow</span> = Risk-off (USD rally)</li>
-                <li>🔴 <span className="text-red-400">Crypto + Tech inflow + Bonds outflow</span> = Risk-on (risk appetite)</li>
-                <li>⚪ <span className="text-slate-400">Equities stable + Others rotating</span> = Sector rotation (no systemic flow)</li>
-              </ul>
+              <div className="caps-sm text-faint mb-3">Rotation Signals</div>
+              <div className="space-y-2 font-sans-body text-[12px]">
+                <div><span className="text-neutral-sage">Metals in + Energy out</span> <span className="text-muted">— Risk-off, USD rally</span></div>
+                <div><span className="text-neutral-sage">Crypto + Tech in + Bonds out</span> <span className="text-muted">— Risk-on, risk appetite expanding</span></div>
+                <div><span className="text-alert-notable">Equities stable + Others rotating</span> <span className="text-muted">— Sector rotation, no systemic flow</span></div>
+                <div><span className="text-alert-extreme">All sectors outflow simultaneously</span> <span className="text-muted">— De-risking event, cash flight</span></div>
+              </div>
             </div>
           </div>
         </section>
 
-        <footer className="pt-4 border-t border-slate-900 text-xs text-slate-700 font-mono flex items-center gap-4">
-          <span>Data: yFinance (OHLCV) · Metrics: MFI, OBV, Volume Momentum · 5min cache</span>
-          <span>·</span>
-          <span>Capital flows reveal market psychology.</span>
-        </footer>
       </div>
+
+      <footer className="max-w-[1440px] mx-auto px-8 py-6 hairline-t">
+        <span className="caps-sm text-faint">Data: yFinance (OHLCV) · Metrics: MFI, OBV, Volume Momentum · 5min cache · Capital flows reveal market psychology.</span>
+      </footer>
     </main>
   );
 }
