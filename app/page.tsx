@@ -15,44 +15,6 @@ import {
 import TradingViewEmbed from "./components/TradingViewEmbed";
 import TradingViewCME from "./components/TradingViewCME";
 
-const FONT_LINK = `
-  @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
-  .font-display { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
-  .font-display-italic { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; }
-  .font-sans-body { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
-  .font-mono-data { font-family: 'IBM Plex Mono', 'Courier New', monospace; font-feature-settings: 'tnum'; }
-  .grid-bg { background-image: linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 48px 48px; }
-  .hairline { border-color: #22231F; }
-  .hairline-b { border-bottom: 1px solid #22231F; }
-  .hairline-t { border-top: 1px solid #22231F; }
-  .caps-sm { letter-spacing: 0.22em; text-transform: uppercase; font-size: 9px; font-weight: 500; }
-  .bg-ink { background-color: #0B0B0C; }
-  .bg-surface { background-color: #131315; }
-  .bg-surface-2 { background-color: #17171A; }
-  .bg-surface-inset { background-color: #0E0E10; }
-  .text-paper { color: #E8E4D9; }
-  .text-paper-2 { color: #B8B5AA; }
-  .text-muted { color: #8A8780; }
-  .text-faint { color: #55534B; }
-  .text-amber-sand { color: #D9A84D; }
-  .text-alert-extreme { color: #C4614A; }
-  .text-alert-notable { color: #C89A3F; }
-  .text-neutral-sage { color: #8DA078; }
-  .bg-amber-sand-10 { background-color: rgba(217, 168, 77, 0.10); }
-  .bg-extreme-10 { background-color: rgba(196, 97, 74, 0.10); }
-  .bg-notable-10 { background-color: rgba(200, 154, 63, 0.10); }
-  .bg-sage-10 { background-color: rgba(141, 160, 120, 0.10); }
-  .border-amber-sand { border-color: rgba(217, 168, 77, 0.35); }
-  .border-extreme { border-color: rgba(196, 97, 74, 0.35); }
-  .border-notable { border-color: rgba(200, 154, 63, 0.35); }
-  .border-sage { border-color: rgba(141, 160, 120, 0.35); }
-  .pulse-dot { animation: pulse-soft 2.4s ease-in-out infinite; }
-  @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-  .fade-in { animation: fade-in 0.6s ease-out both; }
-  @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-  textarea, input { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
-  textarea:focus, input:focus, select:focus { outline: none; border-color: #D9A84D !important; }
-`;
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 const METRICS_CACHE_KEY = "btc_metrics_v1";
@@ -1210,7 +1172,7 @@ export default function BTCDecisionDashboard() {
  
 return (
     <>
-      <style>{FONT_LINK}</style>
+      
       <div className="min-h-screen bg-ink text-paper font-sans-body grid-bg">
         <Header price={price.price} change24h={price.change_24h} onFlushCache={flushCache} flushing={flushing} />
         <main className="max-w-[1440px] mx-auto px-8 py-8 space-y-10">
