@@ -931,7 +931,7 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
 
 const Header = ({ price, change24h, onFlushCache, flushing }: { 
   price: string; 
-  change24h={price.change_24h ?? "+"}; 
+  change24h: string;
   onFlushCache: () => void;
   flushing: boolean;
 }) => (
@@ -946,7 +946,7 @@ const Header = ({ price, change24h, onFlushCache, flushing }: {
           <a href="/macro" className="caps-sm text-muted border hairline px-3 py-1.5 hover:text-paper transition-colors">Macro</a>
           <a href="/sector-flows" className="caps-sm text-muted border hairline px-3 py-1.5 hover:text-paper transition-colors">Sector Flows</a>
         </nav>
-        <div className="text-right"><div className="caps-sm text-faint">Spot</div><div className="font-mono-data text-paper text-[15px]">{price} <span className={`text-[12px] ${change24h.startsWith("+") ? "text-neutral-sage" : "text-alert-extreme"}`}>{change24h}</span></div></div>
+        <div className="text-right"><div className="caps-sm text-faint">Spot</div><div className="font-mono-data text-paper text-[15px]">{price} <span className={`text-[12px] ${(change24h ?? "+").startsWith("+") ? "text-neutral-sage" : "text-alert-extreme"}`}>{change24h}</span></div></div>
         <div className="text-right hidden sm:block"><div className="caps-sm text-faint">Snapshot</div><div className="font-mono-data text-paper-2 text-[12px]" suppressHydrationWarning>{new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" })}</div></div>
         <button
           onClick={onFlushCache}
