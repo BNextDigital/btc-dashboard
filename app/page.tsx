@@ -978,7 +978,7 @@ export default function BTCDecisionDashboard() {
   const [dominanceData, setDominanceData]   = useState<DominanceData | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
-  const [price, setPrice]       = useState<{ price: string; change_24h: string }>({ price: "—", change_24h: "—" });
+  const [price, setPrice] = useState<{ price: string; change_24h: string }>({ price: "–", change_24h: "+" });
   const [summary, setSummary]   = useState<{ structure: string; extreme_count: number; notable_count: number; active_alerts: Array<{ metric: string; alert: string; level: string; current: string }> } | null>(null);
   const [news, setNews]         = useState<Array<{ title: string; source: string; time: string; tag: string; url: string }>>([]);
   const [causal, setCausal]     = useState<{ chain: Array<{ label: string; state: string; weight: string }>; contradiction: string } | null>(null);
