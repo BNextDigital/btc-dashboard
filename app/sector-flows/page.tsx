@@ -2,40 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-const FONT_LINK = `
-  @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
-  .font-display { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
-  .font-display-italic { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; }
-  .font-sans-body { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
-  .font-mono-data { font-family: 'IBM Plex Mono', 'Courier New', monospace; font-feature-settings: 'tnum'; }
-  .hairline { border-color: #22231F; }
-  .hairline-b { border-bottom: 1px solid #22231F; }
-  .hairline-t { border-top: 1px solid #22231F; }
-  .caps-sm { letter-spacing: 0.22em; text-transform: uppercase; font-size: 9px; font-weight: 500; }
-  .bg-ink { background-color: #0B0B0C; }
-  .bg-surface { background-color: #131315; }
-  .bg-surface-2 { background-color: #17171A; }
-  .bg-surface-inset { background-color: #0E0E10; }
-  .text-paper { color: #E8E4D9; }
-  .text-paper-2 { color: #B8B5AA; }
-  .text-muted { color: #8A8780; }
-  .text-faint { color: #55534B; }
-  .text-amber-sand { color: #D9A84D; }
-  .text-alert-extreme { color: #C4614A; }
-  .text-alert-notable { color: #C89A3F; }
-  .text-neutral-sage { color: #8DA078; }
-  .bg-amber-sand-10 { background-color: rgba(217,168,77,0.10); }
-  .bg-extreme-10 { background-color: rgba(196,97,74,0.10); }
-  .bg-notable-10 { background-color: rgba(200,154,63,0.10); }
-  .bg-sage-10 { background-color: rgba(141,160,120,0.10); }
-  .border-extreme { border-color: rgba(196,97,74,0.35); }
-  .border-notable { border-color: rgba(200,154,63,0.35); }
-  .border-sage { border-color: rgba(141,160,120,0.35); }
-  .border-amber-sand { border-color: rgba(217,168,77,0.35); }
-  .pulse-dot { animation: pulse-soft 2.4s ease-in-out infinite; }
-  @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-`;
-
 // ── Types ─────────────────────────────────────────────────────────────────
 interface SectorMetric {
   name: string; ticker: string;
@@ -462,8 +428,6 @@ export default function SectorCapitalFlowMatrix() {
 
   return (
     <main className="bg-ink min-h-screen" style={{ fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
-      <style>{FONT_LINK}</style>
-
       <header className="hairline-b">
         <div className="max-w-[1440px] mx-auto px-8 py-5 flex items-center justify-between">
           <div className="flex items-baseline gap-6">
