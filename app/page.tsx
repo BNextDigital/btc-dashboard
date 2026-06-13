@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import TradingViewEmbed from "./components/TradingViewEmbed";
 import TradingViewCME from "./components/TradingViewCME";
+import DashboardNav from "@/components/DashboardNav";
 
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -934,7 +935,7 @@ const Header = ({ price, change24h, onFlushCache, flushing }: {
   onFlushCache: () => void;
   flushing: boolean;
 }) => (
-import DashboardNav from "@/components/DashboardNav";
+
 
 // Inside the return, where <header> was:
 <DashboardNav current="btc" lastUpdated={lastUpdated} onFlush={flushCache} />
