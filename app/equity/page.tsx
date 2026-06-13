@@ -418,7 +418,7 @@ function MetaphorRef() {
     { instrument: "Breadth (RSP/SPY)", metaphor: "How many shops are open",     signal: "Falling ratio = mega-cap concentration. Fragile rally." },
     { instrument: "Semiconductors", metaphor: "Semiconductor quarter",           signal: "Tech cycle health. Semis lead tech. Semis lead BTC." },
     { instrument: "Banks (XLF)",    metaphor: "Banking district",                signal: "Credit stress indicator. Weak banks = broader concern." },
-    { instrument: "Transports (IYT)","metaphor: Transport & logistics hub",     signal: "Dow Theory: if transports confirm, economy moving goods." },
+    { instrument: "Transports (IYT)",metaphor: "Transport & logistics hub",     signal: "Dow Theory: if transports confirm, economy moving goods." },
     { instrument: "VIX",            metaphor: "City weather alert",              signal: "Spiking VIX = shelter from rain. Risk assets sold." },
   ];
   return (
