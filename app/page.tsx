@@ -942,6 +942,7 @@ const Header = ({ price, change24h, onFlushCache, flushing }: {
       </div>
       <div className="flex items-center gap-6">
         <nav className="flex items-center gap-1">
+          <a href="/liquidity" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors"> Liquidity</a>
           <a href="/macro" className="caps-sm text-muted border hairline px-3 py-1.5 hover:text-paper transition-colors">Macro</a>
           <a href="/sector-flows" className="caps-sm text-muted border hairline px-3 py-1.5 hover:text-paper transition-colors">Sector Flows</a>
         </nav>
