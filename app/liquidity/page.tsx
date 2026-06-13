@@ -61,6 +61,31 @@ interface LiquidityMetrics {
   headwinds:      string[];
 }
 
+interface YieldTenor {
+  label: string;
+  rate:  number;
+  years: number;
+}
+
+interface YieldCurveData {
+  updated_at:        string;
+  source:            string;
+  tenors:            YieldTenor[];
+  spreads: {
+    "2y10y":  number | null;
+    "3m10y":  number | null;
+    "2y30y":  number | null;
+    "5y30y":  number | null;
+    "10y30y": number | null;
+  };
+  shape:             string;
+  shape_description: string;
+  shape_level:       "extreme" | "notable" | "none";
+  spread_2y10y_bp:   number;
+  error?:            string;
+}
+
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -425,18 +450,206 @@ function CityMapLegend() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+
+// ─── Yield Curve Section ──────────────────────────────────────────────────────
+
+function YieldCurveSection({ yc }: { yc: YieldCurveData }) {
+  if (yc.error) {
+    return (
+      <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+        <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-2">Yield Curve</div>
+        <div className="text-sm text-red-400 font-mono">{yc.error}</div>
+      </div>
+    );
+  }
+
+  const shapeColor =
+    yc.shape_level === "extreme" ? "#E05252" :
+    yc.shape_level === "notable" ? "#D9A84D" : "#6A9A6A";
+
+  const spreadColor = (bp: number | null) => {
+    if (bp === null) return "#55534B";
+    if (bp <= -50)  return "#E05252";
+    if (bp < 0)     return "#E07A52";
+    if (bp < 25)    return "#D9A84D";
+    return "#6A9A6A";
+  };
+
+  // Build SVG curve — plot rate vs tenor years
+  const plotPoints = yc.tenors.filter(t => t.years != null && t.rate != null);
+  let curveSvg: string | null = null;
+  if (plotPoints.length >= 3) {
+    const W = 480, H = 120, PX = 32, PY = 16;
+    const minYears = Math.min(...plotPoints.map(t => t.years));
+    const maxYears = Math.max(...plotPoints.map(t => t.years));
+    const minRate  = Math.min(...plotPoints.map(t => t.rate));
+    const maxRate  = Math.max(...plotPoints.map(t => t.rate));
+    const rateRange = maxRate - minRate || 0.5;
+    const toX = (y: number) => PX + ((y - minYears) / (maxYears - minYears)) * (W - PX * 2);
+    const toY = (r: number) => PY + (1 - (r - minRate) / rateRange) * (H - PY * 2);
+    const pts = plotPoints.map(t => `${toX(t.years).toFixed(1)},${toY(t.rate).toFixed(1)}`).join(" ");
+    // Area fill path
+    const first = plotPoints[0];
+    const last  = plotPoints[plotPoints.length - 1];
+    const area  = `M${toX(first.years).toFixed(1)},${H - PY} ` +
+                  plotPoints.map(t => `L${toX(t.years).toFixed(1)},${toY(t.rate).toFixed(1)}`).join(" ") +
+                  ` L${toX(last.years).toFixed(1)},${H - PY} Z`;
+    curveSvg = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${H}px">
+        <defs>
+          <linearGradient id="curve-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${shapeColor}" stop-opacity="0.15"/>
+            <stop offset="100%" stop-color="${shapeColor}" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="${area}" fill="url(#curve-fill)"/>
+        <polyline points="${pts}" fill="none" stroke="${shapeColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        ${plotPoints.map(t => `<circle cx="${toX(t.years).toFixed(1)}" cy="${toY(t.rate).toFixed(1)}" r="3" fill="${shapeColor}" opacity="0.8"/>`).join("")}
+      </svg>`;
+  }
+
+  const keyTenors = ["3M", "2Y", "5Y", "10Y", "30Y"];
+  const tenorMap = Object.fromEntries(yc.tenors.map(t => [t.label, t]));
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
+
+      {/* ── Header row ── */}
+      <div className="px-5 py-4 border-b border-slate-900 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-4">
+          {/* Shape pill */}
+          <span className="text-sm font-mono font-medium" style={{ color: shapeColor }}>
+            {yc.shape}
+          </span>
+          <span className="text-[11px] text-slate-500">{yc.shape_description}</span>
+        </div>
+        <div className="text-[10px] font-mono text-slate-700">{yc.source}</div>
+      </div>
+
+      {/* ── SVG curve + key tenor snapshot ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3">
+
+        {/* Curve chart — 2/3 width */}
+        <div className="lg:col-span-2 px-5 pt-4 pb-2 border-b lg:border-b-0 lg:border-r border-slate-900">
+          <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-3">
+            Curve Shape · Rate (%) vs Maturity
+          </div>
+          {curveSvg ? (
+            <div dangerouslySetInnerHTML={{ __html: curveSvg }} />
+          ) : (
+            <div className="h-20 flex items-center justify-center text-xs text-slate-700 font-mono">
+              Insufficient tenor data
+            </div>
+          )}
+          {/* X-axis labels */}
+          <div className="flex justify-between text-[9px] font-mono text-slate-700 mt-1 px-6">
+            {yc.tenors.filter((_, i) => i % 2 === 0).map(t => (
+              <span key={t.label}>{t.label}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Key tenors — 1/3 width */}
+        <div className="px-5 py-4">
+          <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-3">
+            Key Tenors
+          </div>
+          <div className="space-y-2">
+            {keyTenors.map(label => {
+              const t = tenorMap[label];
+              if (!t) return null;
+              return (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-slate-500 w-10">{label}</span>
+                  <div className="flex-1 mx-3 h-0.5 rounded-full bg-slate-800 relative">
+                    {/* Simple rate bar — 0–8% range */}
+                    <div className="absolute left-0 top-0 h-full rounded-full"
+                      style={{ width: `${Math.min(t.rate / 8 * 100, 100)}%`, backgroundColor: shapeColor + "88" }} />
+                  </div>
+                  <span className="text-[12px] font-mono text-slate-200 w-12 text-right">
+                    {t.rate.toFixed(2)}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Spreads row ── */}
+      <div className="border-t border-slate-900 px-5 py-4">
+        <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-3">
+          Key Spreads
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[
+            { label: "2Y–10Y", key: "2y10y",  note: "Primary recession signal" },
+            { label: "3M–10Y", key: "3m10y",  note: "Fed's preferred signal" },
+            { label: "2Y–30Y", key: "2y30y",  note: "Long-term steepness" },
+            { label: "5Y–30Y", key: "5y30y",  note: "Back-end slope" },
+            { label: "10Y–30Y", key: "10y30y", note: "Long-end curve" },
+          ].map(({ label, key, note }) => {
+            const bp = yc.spreads[key as keyof typeof yc.spreads];
+            return (
+              <div key={key} className="text-center">
+                <div className="text-[9px] font-mono text-slate-600 mb-1">{label}</div>
+                <div className="text-base font-mono" style={{ color: spreadColor(bp) }}>
+                  {bp !== null ? `${bp >= 0 ? "+" : ""}${bp}bp` : "—"}
+                </div>
+                <div className="text-[9px] text-slate-700 mt-0.5">{note}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Full tenor table ── */}
+      <div className="border-t border-slate-900 overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-slate-900">
+              {yc.tenors.map(t => (
+                <th key={t.label} className="px-3 py-2 text-[10px] font-mono text-slate-600 font-normal text-center">
+                  {t.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {yc.tenors.map(t => (
+                <td key={t.label} className="px-3 py-2.5 font-mono text-center text-slate-200 text-[12px]">
+                  {t.rate.toFixed(2)}%
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function LiquidityDashboard() {
   const [data, setData]               = useState<LiquidityMetrics | null>(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [yieldCurve, setYieldCurve]   = useState<YieldCurveData | null>(null);
 
   const fetchAll = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/liquidity/metrics`);
-      if (!res.ok) throw new Error(`Backend returned ${res.status}`);
-      const json: LiquidityMetrics = await res.json();
+      const [metricsRes, yieldRes] = await Promise.all([
+        fetch(`${API}/liquidity/metrics`),
+        fetch(`${API}/liquidity/yield-curve`),
+      ]);
+      if (!metricsRes.ok) throw new Error(`Backend returned ${metricsRes.status}`);
+      const json: LiquidityMetrics = await metricsRes.json();
       setData(json);
+      if (yieldRes.ok) {
+        const yj: YieldCurveData = await yieldRes.json();
+        setYieldCurve(yj);
+      }
       setLastUpdated(
         new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
       );
@@ -449,7 +662,10 @@ export default function LiquidityDashboard() {
   }, []);
 
   const flushCache = async () => {
-    await fetch(`${API}/liquidity/cache/flush`);
+    await Promise.all([
+      fetch(`${API}/liquidity/cache/flush`),
+      fetch(`${API}/liquidity/yield-curve/cache/flush`),
+    ]);
     fetchAll();
   };
 
@@ -635,12 +851,32 @@ export default function LiquidityDashboard() {
               />
               <CityMapLegend />
             </section>
+
+            {/* ── VI. Yield Curve ───────────────────────────────────────── */}
+            {yieldCurve && !yieldCurve.error && (
+              <section>
+                <SectionLabel
+                  num="VI"
+                  title="US Treasury Yield Curve"
+                  subtitle="CMT rates · US Treasury direct · city gravity"
+                />
+                <YieldCurveSection yc={yieldCurve} />
+              </section>
+            )}
+            {yieldCurve?.error && (
+              <section>
+                <SectionLabel num="VI" title="US Treasury Yield Curve" />
+                <div className="rounded-xl border border-slate-800 bg-slate-950 px-5 py-4 text-sm text-red-400 font-mono">
+                  {yieldCurve.error}
+                </div>
+              </section>
+            )}
           </>
         )}
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}
         <footer className="pt-4 border-t border-slate-900 text-xs text-slate-700 font-mono flex items-center gap-4 flex-wrap">
-          <span>Data: FRED API (free) · WRESBAL · WTREGEN · RRPONTSYD · SOFR · FEDFUNDS · M2SL</span>
+          <span>Data: FRED API · WRESBAL · WTREGEN · RRPONTSYD · SOFR · FEDFUNDS · M2SL · US Treasury CMT (yield curve)</span>
           <span>·</span>
           <span>Backend cache: 1hr</span>
           <span>·</span>
