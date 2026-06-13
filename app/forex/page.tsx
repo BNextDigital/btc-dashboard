@@ -454,7 +454,7 @@ function FxMetaphorMap() {
     { instrument: "USD/CNH",    metaphor: "Asia risk signal",              btc: "Weak CNH = regional stress / capital outflows. Watch PBOC." },
     { instrument: "EM FX",      metaphor: "Emerging market gusts",         btc: "Rising EM USD pairs = broad USD dominance = global headwind." },
     { instrument: "FX Vol",     metaphor: "Wind turbulence index",         btc: "Spiking FX vol often precedes deleveraging across risk assets." },
-    { instrument: "Carry Trade","metaphor: Borrow cheap water from Japan", btc: "Carry unwind = forced liquidation. Most dangerous tail risk from FX." },
+    { instrument: "Carry Trade",metaphor: "Borrow cheap water from Japan", btc: "Carry unwind = forced liquidation. Most dangerous tail risk from FX." },
   ];
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
