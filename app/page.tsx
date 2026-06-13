@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import TradingViewEmbed from "./components/TradingViewEmbed";
 import TradingViewCME from "./components/TradingViewCME";
-import DashboardNav from "@/components/DashboardNav";
+import DashboardNav from "./components/DashboardNav";
 
 
 const API = process.env.NEXT_PUBLIC_API_URL;
