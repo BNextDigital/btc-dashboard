@@ -45,6 +45,8 @@ interface CommodityCard {
 interface CopperGold {
   ratio?: string;
   ratio_raw?: number;
+  percentile?: number;
+  spark?: number[];
   read?: string;
   alert_level?: "extreme" | "notable" | "none";
   note?: string;
@@ -232,13 +234,26 @@ function CopperGoldPanel({ cg, copper, gold }: { cg: CopperGold; copper: Commodi
   const color = alertColor(level);
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-900 flex items-center justify-between">
+      <div className="px-5 py-4 border-b border-slate-900 flex items-center justify-between flex-wrap gap-2">
         <div>
           <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">Copper / Gold Ratio</div>
           <div className="text-[10px] font-mono mt-0.5" style={{ color: "#D9A84D88" }}>Industrial demand vs insurance demand</div>
         </div>
-        <div className="font-mono text-xl" style={{ color }}>{cg.ratio ?? "—"}</div>
+        <div className="flex items-center gap-3">
+          {cg.spark && cg.spark.length > 1 && <Sparkline data={cg.spark} color={color} />}
+          <div className="text-right">
+            <div className="font-mono text-xl" style={{ color }}>{cg.ratio ?? "—"}</div>
+            {cg.percentile != null && (
+              <div className="text-[10px] font-mono text-slate-600">{cg.percentile}th pct (52w)</div>
+            )}
+          </div>
+        </div>
       </div>
+      {cg.percentile != null && (
+        <div className="px-5 pt-3">
+          <PercentileBar value={cg.percentile} />
+        </div>
+      )}
       <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <p className="text-sm text-slate-400 leading-relaxed mb-3">{cg.read}</p>
