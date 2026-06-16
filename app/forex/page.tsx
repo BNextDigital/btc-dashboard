@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
-import DashboardNav from "@/components/DashboardNav";
+import DashboardNav from "../components/DashboardNav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
