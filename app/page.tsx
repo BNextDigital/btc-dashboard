@@ -64,6 +64,22 @@ type ProxyStock = {
   lead_lag_label: string; lead_lag_days: number;
   regime: string; spark: number[];
 };
+type EtfAumData = {
+  total_aum:     string;
+  total_aum_raw: number | null;
+  d7_chg:        string;
+  d7_pct:        string;
+  d30_chg:       string;
+  d30_pct:       string;
+  percentile:    number;
+  alert:         string;
+  alert_level:   "extreme" | "notable" | "none";
+  spark:         number[];
+  breakdown:     Array<{ ticker: string; name: string; aum: string; share_pct: number | null }>;
+  etf_count:     number;
+  note:          string;
+  updated_at:    string;
+};
 
 const INITIAL_TRADE_LOGS = [
   { date: "Oct 26", structure: "Range high test", read: "Absorption at $67.8k", plan: "Scale in, tight invalidation", result: "Pending", bias: "—" },
