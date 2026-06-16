@@ -22,6 +22,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import DashboardNav from "@/components/DashboardNav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -454,7 +455,7 @@ function FxMetaphorMap() {
     { instrument: "USD/CNH",    metaphor: "Asia risk signal",              btc: "Weak CNH = regional stress / capital outflows. Watch PBOC." },
     { instrument: "EM FX",      metaphor: "Emerging market gusts",         btc: "Rising EM USD pairs = broad USD dominance = global headwind." },
     { instrument: "FX Vol",     metaphor: "Wind turbulence index",         btc: "Spiking FX vol often precedes deleveraging across risk assets." },
-    { instrument: "Carry Trade",metaphor: "Borrow cheap water from Japan", btc: "Carry unwind = forced liquidation. Most dangerous tail risk from FX." },
+    { instrument: "Carry Trade","metaphor: Borrow cheap water from Japan", btc: "Carry unwind = forced liquidation. Most dangerous tail risk from FX." },
   ];
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
@@ -526,31 +527,12 @@ export default function ForexDashboard() {
       <div className="max-w-7xl mx-auto space-y-8">
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <header className="flex items-center justify-between pb-4 border-b border-slate-900">
-          <div className="flex items-baseline gap-4">
-            <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 24, fontWeight: 400 }}>
-              USD &amp; Forex
-            </h1>
-            <div className="flex items-center gap-1.5 text-xs font-mono text-slate-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-              {lastUpdated ? `Updated ${lastUpdated} UTC` : "Loading…"}
-            </div>
-          </div>
-          <nav className="flex gap-1 flex-wrap justify-end">
-            <a href="/" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors">BTC</a>
-            <a href="/macro" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors">Macro</a>
-            <a href="/liquidity" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors">Liquidity</a>
-            <span className="text-xs px-3 py-1.5 rounded-md border font-mono"
-              style={{ background: "#1C1C1E", color: "#D9A84D", borderColor: "#3A3228" }}>
-              Forex
-            </span>
-            <a href="/sector-flows" className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors">Sector Flows</a>
-            <button onClick={flushCache}
-              className="text-xs px-3 py-1.5 rounded-md border border-slate-800 text-slate-600 hover:text-slate-300 hover:border-slate-600 transition-colors font-mono">
-              ↺ flush
-            </button>
-          </nav>
-        </header>
+        <DashboardNav
+          current="forex"
+          title="USD &amp; Forex"
+          lastUpdated={lastUpdated}
+          onFlush={flushCache}
+        />
 
         {/* ── Error ── */}
         {error && (
