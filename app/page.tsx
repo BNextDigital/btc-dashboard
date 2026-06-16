@@ -894,7 +894,7 @@ const TradeExecutionPanel = ({ executions, onAdd }: { executions: any[]; onAdd: 
     } catch (e) { setSaveError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
   };
   
- const EtfAumCard = ({ data }: { data: EtfAumData }) => {
+const EtfAumCard = ({ data }: { data: EtfAumData }) => {
   const a = alertClasses(data.alert_level);
 
   const spark = data.spark ?? [];
@@ -994,8 +994,6 @@ const TradeExecutionPanel = ({ executions, onAdd }: { executions: any[]; onAdd: 
     </div>
   );
 };
-  
-  
   const marketStates = ["Green", "Yellow", "Red"]; const stateColors: Record<string, string> = { Green: "text-neutral-sage border-sage bg-sage-10", Yellow: "text-alert-notable border-notable bg-notable-10", Red: "text-alert-extreme border-extreme bg-extreme-10" };
   return (
     <div className="bg-surface border hairline">
