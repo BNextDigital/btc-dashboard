@@ -18,10 +18,8 @@
  *   2. That's it — every page using this component gets the new link automatically
  */
 
-import { usePathname } from "next/navigation";
-
 // ─── Nav registry ─────────────────────────────────────────────────────────────
-// Add new pages here. Order determines display order.
+// Add new pages here. Order determines display order in the nav bar.
 const NAV_ITEMS = [
   { key: "btc",          href: "/",            label: "BTC" },
   { key: "macro",        href: "/macro",        label: "Macro" },
@@ -59,9 +57,7 @@ export default function DashboardNav({
   const displayTitle = title ?? activeItem?.label ?? current;
 
   return (
-    <header
-      className="flex items-center justify-between pb-4 border-b border-slate-900 flex-wrap gap-4"
-    >
+    <header className="flex items-center justify-between pb-4 border-b border-slate-900 flex-wrap gap-4">
       {/* ── Left: title + live indicator ── */}
       <div className="flex items-baseline gap-4">
         <h1
