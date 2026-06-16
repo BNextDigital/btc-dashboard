@@ -1001,6 +1001,7 @@ export default function BTCDecisionDashboard() {
   const [proxyStocks, setProxyStocks] = useState<ProxyStock[]>([]);
   const [fromCache, setFromCache] = useState(false);
   const [flushing, setFlushing]   = useState(false);
+  const [etfAum, setEtfAum]       = useState<EtfAumData | null>(null);
  
   // ── Date picker state ────────────────────────────────────────────────────
   const [selectedDate, setSelectedDate]                 = useState<string>("");
@@ -1009,6 +1010,70 @@ export default function BTCDecisionDashboard() {
   const [historicalError, setHistoricalError]           = useState<string | null>(null);
   const [historicalStablecoin, setHistoricalStablecoin] = useState<StablecoinData | null>(null);
   const [historicalDominance, setHistoricalDominance]   = useState<DominanceData | null>(null);
+
+  const EtfAumCard = ({ data }: { data: EtfAumData }) => {
+  const a = alertClasses(data.alert_level);
+
+  const spark = data.spark ?? [];
+  let sparkSvg: React.ReactNode = null;
+  if (spark.length >= 2) {
+    const w = 80, h = 24;
+    const min = Math.min(...spark), max = Math.max(...spark);
+    const range = max - min || 1;
+    const pts = spark.map((v, i) => {
+      const x = (i / (spark.length - 1)) * w;
+      const y = h - ((v - min) / range) * h;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ");
+    sparkSvg = (
+      <svg width={w} height={h} className="overflow-visible">
+        <polyline fill="none" stroke="#D9A84D" strokeWidth="1.25"
+          strokeLinejoin="round" strokeLinecap="round" points={pts} opacity="0.85" />
+      </svg>
+    );
+  }
+
+  return (
+    <div className={`fade-in bg-surface border hairline p-4 flex flex-col gap-3 hover:bg-surface-2 transition-colors duration-300 ${a.bg}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="caps-sm text-faint mb-1">Flow · Institutional</div>
+          <h3 className="font-sans-body text-paper text-[14px] font-medium leading-tight">ETF Market Cap</h3>
+        </div>
+        {data.alert_level !== "none" && (
+          <span className={`caps-sm px-2 py-[3px] border ${a.border} ${a.bg} ${a.text} whitespace-nowrap`}>
+            {data.alert}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-end justify-between gap-3">
+        <span className="font-mono-data text-paper text-[22px] leading-none tracking-tight">
+          {data.total_aum}
+        </span>
+        {sparkSvg}
+      </div>
+
+      <div className="w-full">
+        <div className="h-[3px] w-full bg-surface-inset relative overflow-hidden">
+          <div className="absolute top-0 left-0 h-full" style={{
+            width: `${data.percentile}%`,
+            backgroundColor: data.percentile >= 90 ? "#C4614A" : data.percentile >= 75 ? "#C89A3F" : "#8A8780",
+            transition: "width 600ms ease-out"
+          }} />
+          <div className="absolute top-0 h-full w-px" style={{ left: "75%", backgroundColor: "#2F2F2F" }} />
+          <div className="absolute top-0 h-full w-px" style={{ left: "90%", backgroundColor: "#2F2F2F" }} />
+        </div>
+      </div>
+
+      <div className="space-y-1.5 text-xs hairline-t pt-3">
+        <div className="flex justify-between">
+          <span className="caps-sm text-faint">7d</span>
+          <span className={`font-mono-data text-[11px] ${data.d7_chg.startsWith("+") ? "text-neutral-sage" : data.d7_chg.startsWith("-") ? "text-alert-extreme" : "text-paper-2"}`}>
+            {data.d7_chg} <span className="text-faint">({data.d7_pct})</span>
+          </span>
+        </div>
+        <div className="flex
  
   // ── Clock tick ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1056,6 +1121,7 @@ export default function BTCDecisionDashboard() {
         .then(r => r.json())
         .then(d => { if (d.crypto_proxies) setProxyStocks(Object.values(d.crypto_proxies) as ProxyStock[]); })
         .catch(err => console.error("[proxy stocks]", err));
+      fetch(`${API}/etf-aum/metrics`).then(r => r.ok ? r.json() : null).then(d => { if (d) setEtfAum(d); }).catch(() => {});
       const transformed: Metric[] = Object.entries(data)
         .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance")
         .map(([id, raw]) => {
@@ -1279,6 +1345,8 @@ return (
   : <MetricCard key={m.id} metric={m} index={i} /> 
         )
   )}
+             {/* ETF AUM — appended to Section I metric grid, live mode only */}
+  {!selectedDate && etfAum && <EtfAumCard data={etfAum} />}
 </div>
           </section>
 
