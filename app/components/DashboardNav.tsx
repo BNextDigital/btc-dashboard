@@ -35,13 +35,15 @@
 // ─── Nav registry ─────────────────────────────────────────────────────────────
 
 export const NAV_ITEMS = [
-  { key: "btc",          href: "/",            label: "BTC" },
-  { key: "macro",        href: "/macro",        label: "Macro" },
-  { key: "liquidity",    href: "/liquidity",    label: "Liquidity" },
-  { key: "forex",        href: "/forex",        label: "Forex" },
-  { key: "growth",       href: "/growth",       label: "Growth" },
-  { key: "equity",       href: "/equity",       label: "Equity" },
-  { key: "commodities",  href: "/commodities",  label: "Commodities" },
+  { key: "btc",          href: "/",             label: "BTC" },
+  { key: "macro",        href: "/macro",         label: "Macro" },
+  { key: "liquidity",    href: "/liquidity",     label: "Liquidity" },
+  { key: "forex",        href: "/forex",         label: "Forex" },
+  { key: "growth",       href: "/growth",        label: "Growth" },
+  { key: "equity",       href: "/equity",        label: "Equity" },
+  { key: "commodities",  href: "/commodities",   label: "Commodities" },
+  { key: "sector-flows", href: "/sector-flows",  label: "Sector Flows" },
+  { key: "leading",      href: "/leading",       label: "Leading" },
 ] as const;
 
 export type NavKey = (typeof NAV_ITEMS)[number]["key"];
