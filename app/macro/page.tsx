@@ -337,10 +337,10 @@ function MacroCausalChain({ macro }: { macro: MacroMetrics }) {
       signals.push({ dir: "neutral", text: `VIX at ${fmt(vix.current, 1)} — neutral volatility regime` });
   }
 
-  if (hy_oas?.current != null) {
+ if (hy_oas?.current != null) {
     if (hy_oas.current >= 450)
       signals.push({ dir: "up", text: `HY OAS at ${fmt(hy_oas.current, 0)}bp — credit stress elevated` });
-    else if ((hy_oas.d5_chg ?? 0) < -15)
+    else if ((hy_oas.d5_chg ?? 0) < -10)
       signals.push({ dir: "down", text: `HY spreads tightening (${fmtSigned(hy_oas.d5_chg ?? 0, 0)}bp 5d) — credit improving` });
     else
       signals.push({ dir: "neutral", text: `HY OAS ${fmt(hy_oas.current, 0)}bp — moderately stressed, watch direction` });
