@@ -153,7 +153,7 @@ function structureColor(s: string): string {
   }
 }
 
-function fmtUsd(v: number | null, decimals = 1): string {
+function fmtUsd(v: number | null | undefined, decimals = 1): string {
   if (v == null) return "—";
   if (v >= 1e9) return `$${(v / 1e9).toFixed(decimals)}B`;
   if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
