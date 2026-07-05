@@ -35,15 +35,17 @@
 // ─── Nav registry ─────────────────────────────────────────────────────────────
 
 export const NAV_ITEMS = [
-  { key: "btc",          href: "/",             label: "BTC" },
-  { key: "macro",        href: "/macro",         label: "Macro" },
-  { key: "liquidity",    href: "/liquidity",     label: "Liquidity" },
-  { key: "forex",        href: "/forex",         label: "Forex" },
-  { key: "growth",       href: "/growth",        label: "Growth" },
-  { key: "equity",       href: "/equity",        label: "Equity" },
-  { key: "commodities",  href: "/commodities",   label: "Commodities" },
+  { key: "btc",          href: "/",             label: "BTC"          },
+  { key: "eth",          href: "/eth",           label: "ETH"          },
+  { key: "sol",          href: "/sol",           label: "SOL"          },
+  { key: "macro",        href: "/macro",         label: "Macro"        },
+  { key: "liquidity",    href: "/liquidity",     label: "Liquidity"    },
+  { key: "forex",        href: "/forex",         label: "Forex"        },
+  { key: "growth",       href: "/growth",        label: "Growth"       },
+  { key: "equity",       href: "/equity",        label: "Equity"       },
+  { key: "commodities",  href: "/commodities",   label: "Commodities"  },
   { key: "sector-flows", href: "/sector-flows",  label: "Sector Flows" },
-  { key: "leading",      href: "/leading",       label: "Leading" },
+  { key: "leading",      href: "/leading",       label: "Leading"      },
 ] as const;
 
 export type NavKey = (typeof NAV_ITEMS)[number]["key"];
@@ -66,9 +68,9 @@ export function NavLinks({ current, className }: NavLinksProps) {
               key={item.key}
               className="text-xs px-3 py-1.5 rounded-md border font-mono"
               style={{
-                background:   "#1C1C1E",
-                color:        "#D9A84D",
-                borderColor:  "#3A3228",
+                background:  "#1C1C1E",
+                color:       "#D9A84D",
+                borderColor: "#3A3228",
               }}
             >
               {item.label}
