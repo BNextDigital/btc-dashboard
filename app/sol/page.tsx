@@ -29,6 +29,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import DashboardNav from "../components/DashboardNav";
+import TradingViewEmbed from "../components/TradingViewEmbed";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -731,6 +732,13 @@ export default function SolDecisionDashboard() {
             AI organizes reality · Humans make decisions
           </div>
         </div>
+
+        {/* ── Price chart ───────────────────────────────────────────────── */}
+        <TradingViewEmbed
+          symbol="BINANCE:SOLUSDT"
+          label="SOL price structure"
+          subtitle="BINANCE · SOLUSDT · 1D"
+        />
 
         {/* ── I. Core metrics ────────────────────────────────────────────── */}
         <section>
