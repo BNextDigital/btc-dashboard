@@ -29,6 +29,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import DashboardNav from "../components/DashboardNav";
+import TradingViewEmbed from "../components/TradingViewEmbed";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -777,6 +778,13 @@ export default function EthDecisionDashboard() {
             AI organizes reality · Humans make decisions
           </div>
         </div>
+
+        {/* ── Price chart ───────────────────────────────────────────────── */}
+        <TradingViewEmbed
+          symbol="BINANCE:ETHUSDT"
+          label="ETH price structure"
+          subtitle="BINANCE · ETHUSDT · 1D"
+        />
 
         {/* ── I. Core metrics ────────────────────────────────────────────── */}
         <section>
