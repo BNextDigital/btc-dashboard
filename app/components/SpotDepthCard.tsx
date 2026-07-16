@@ -170,7 +170,7 @@ function Badge({ level, label }: { level: AlertLevel; label: string }) {
 
 // ─── Main Card ────────────────────────────────────────────────────────────────
 
-export function SpotDepthCard({ data }: { data: SpotDepthData }) {
+export default function SpotDepthCard({ data }: { data: SpotDepthData }) {
   const ac    = data.adjusted_coverage;
   const col   = alertColors[data.alert_level];
   const cvCol = coverageColor(ac);
