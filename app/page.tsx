@@ -1260,10 +1260,12 @@ export default function BTCDecisionDashboard() {
       const execRes     = await fetch(`${API}/trade-execution`); const execData     = await execRes.json();     if (Array.isArray(execData)) setExecutions(execData);
       if (data["stablecoin_supply"]) setStablecoinData(data["stablecoin_supply"] as StablecoinData);
       if (data["btc_dominance"])     setDominanceData(data["btc_dominance"] as DominanceData);
-      const depthRes  = await fetch(`${API}/liquidity/depth`);
-  const depthJson = await depthRes.json();
-  if (!depthJson.error) setSpotDepth(depthJson);
-} catch (e) { console.warn("[SpotDepth] fetch failed", e); }
+     // Inside the outer try block, alongside the other fetches:
+    const depthRes = await fetch(`${API}/liquidity/depth`).catch(() => null);
+    if (depthRes?.ok) {
+      const depthJson = await depthRes.json().catch(() => null);
+      if (depthJson && !depthJson.error) setSpotDepth(depthJson);
+    }
       // Proxy stocks — intentionally not awaited (slow yFinance calls, 5-min backend cache)
       fetch(`${API}/crypto-proxies`)
         .then(r => r.json())
