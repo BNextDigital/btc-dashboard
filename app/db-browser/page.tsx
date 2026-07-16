@@ -1,344 +1,440 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BTC DB Browser</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
-    background: #0B0B0C;
-    color: #E8E3D9;
-    min-height: 100vh;
-    padding: 24px;
-  }
-  h1 { font-size: 15px; font-weight: 500; color: #D9A84D; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 20px; }
-  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-  .tab {
-    padding: 5px 14px; font-size: 12px; border: 1px solid #2a2a2b;
-    border-radius: 99px; cursor: pointer; background: #141415;
-    color: #888; white-space: nowrap; transition: all 0.15s;
-  }
-  .tab:hover { color: #E8E3D9; border-color: #444; }
-  .tab.active { background: rgba(217,168,77,0.12); color: #D9A84D; border-color: rgba(217,168,77,0.35); }
-  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
-  select, input[type=text] {
-    height: 34px; padding: 0 10px; font-size: 13px;
-    background: #141415; border: 1px solid #2a2a2b;
-    border-radius: 6px; color: #E8E3D9; outline: none;
-  }
-  select:focus, input:focus { border-color: #D9A84D; }
-  input[type=text] { flex: 1; min-width: 160px; }
-  button {
-    height: 34px; padding: 0 14px; font-size: 12px; font-weight: 500;
-    border: 1px solid #2a2a2b; border-radius: 6px;
-    background: #141415; color: #E8E3D9; cursor: pointer;
-    white-space: nowrap; transition: all 0.15s;
-  }
-  button:hover { border-color: #444; background: #1c1c1e; }
-  button.primary { background: rgba(217,168,77,0.15); color: #D9A84D; border-color: rgba(217,168,77,0.35); }
-  button.primary:hover { background: rgba(217,168,77,0.22); }
-  button:disabled { opacity: 0.35; cursor: default; }
-  .meta-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; min-height: 24px; }
-  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; }
-  .badge.count { background: rgba(217,168,77,0.12); color: #D9A84D; }
-  .badge.dates { background: rgba(255,255,255,0.05); color: #888; }
-  .meta-txt { font-size: 11px; color: #666; }
-  .tbl-wrap {
-    overflow-x: auto; border: 1px solid #1e1e20;
-    border-radius: 8px; background: #0f0f10;
-  }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  thead { border-bottom: 1px solid #1e1e20; }
-  th {
-    padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 500;
-    color: #555; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.06em;
-    background: #0f0f10; cursor: pointer; user-select: none;
-  }
-  th:hover { color: #888; }
-  td {
-    padding: 6px 12px; border-bottom: 1px solid #161618;
-    font-family: 'IBM Plex Mono', 'Fira Code', monospace;
-    font-size: 11.5px; white-space: nowrap;
-    max-width: 240px; overflow: hidden; text-overflow: ellipsis;
-  }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: #141415; }
-  td.date-col { color: #666; }
-  td.num-col { text-align: right; color: #D9A84D; }
-  td.str-col { color: #C8C2B8; }
-  td.null-col { color: #3a3a3c; font-style: italic; }
-  .pagination { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-  .page-info { flex: 1; text-align: center; font-size: 12px; color: #555; }
-  .status { padding: 40px; text-align: center; color: #444; font-size: 13px; }
-  .error { padding: 12px 14px; background: rgba(220,50,50,0.08); border: 1px solid rgba(220,50,50,0.2); color: #e05c5c; border-radius: 6px; font-size: 12px; margin-bottom: 12px; display: none; }
-  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #2a2a2b; border-top-color: #D9A84D; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -3px; margin-right: 6px; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .thinking { color: #666; font-size: 12px; padding: 30px; text-align: center; }
-</style>
-</head>
-<body>
+"use client";
 
-<h1>⬡ BTC Dashboard — Database Browser</h1>
+import { useState, useEffect, useMemo, useCallback } from "react";
 
-<div class="tabs" id="dbTabs"></div>
-
-<div class="toolbar">
-  <select id="tableSelect"><option value="">— select table —</option></select>
-  <input type="text" id="filterInput" placeholder="Filter rows…" />
-  <button class="primary" onclick="loadTable()">Load data</button>
-  <button onclick="exportCSV()">↓ CSV</button>
-</div>
-
-<div class="error" id="errorBox"></div>
-<div class="meta-bar" id="metaBar"></div>
-
-<div class="tbl-wrap" id="tblWrap">
-  <div class="status">Select a database tab, then a table, then click Load data.</div>
-</div>
-
-<div class="pagination" id="paginator" style="display:none">
-  <button id="prevBtn" onclick="changePage(-1)">‹ Prev</button>
-  <span class="page-info" id="pageInfo"></span>
-  <button id="nextBtn" onclick="changePage(1)">Next ›</button>
-</div>
-
-<script>
-const API_URL = "https://btc-dashboard-api-production.up.railway.app";
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const PAGE_SIZE = 75;
 
-// Each database has a known endpoint to fetch its data
-const DATABASES = [
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Row = Record<string, unknown>;
+
+interface DbConfig {
+  id: string;
+  label: string;
+  fetchFn: () => Promise<Row[]>;
+}
+
+// ─── Database configs ─────────────────────────────────────────────────────────
+
+const DATABASES: DbConfig[] = [
   {
     id: "manual_history",
     label: "manual_history",
-    tables: {
-      "metric_history": () => fetchJson("/history/exchange_netflow?days=365")
-        .then(() => null) // will use dedicated endpoint below
-    },
     fetchFn: async () => {
-      // Fetch all metrics from manual history
-      const metrics = ["exchange_netflow","lth_supply","etf_flow","realized_cap","funding","open_interest","cme_basis"];
-      const all = [];
+      const metrics = [
+        "exchange_netflow", "lth_supply", "etf_flow",
+        "realized_cap", "funding", "open_interest", "cme_basis",
+      ];
+      const all: Row[] = [];
       for (const m of metrics) {
         try {
-          const d = await fetchJson(`/history/${m}?days=365`);
-          if (d && d.entries) d.entries.forEach(e => all.push({metric: m, ...e}));
+          const res = await fetch(`${API}/history/${m}?days=365`);
+          if (!res.ok) continue;
+          const d = await res.json();
+          if (d?.entries) d.entries.forEach((e: Row) => all.push({ metric: m, ...e }));
         } catch {}
       }
       return all;
     },
-    tableNames: ["metric_history (all metrics)"],
   },
   {
     id: "basis_history",
     label: "basis_history",
-    tableNames: ["cme_basis"],
     fetchFn: async () => {
-      const d = await fetchJson("/db/summary");
-      // Use dedicated basis endpoint
-      const rows = await fetchJson("/db/basis/query/cme_basis?limit=1000").catch(() => null);
-      if (rows) return Array.isArray(rows) ? rows : rows.rows || rows.entries || [];
-      return [];
+      const res = await fetch(`${API}/db/basis/query/cme_basis?limit=1000`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      const d = await res.json();
+      return Array.isArray(d) ? d : d.rows ?? d.entries ?? [];
     },
   },
   {
     id: "stablecoin_history",
     label: "stablecoin_history",
-    tableNames: ["stablecoin_supply"],
     fetchFn: async () => {
-      const rows = await fetchJson("/db/stablecoin/query/stablecoin_supply?limit=1000").catch(() => null);
-      if (rows) return Array.isArray(rows) ? rows : rows.rows || rows.entries || [];
-      return [];
+      const res = await fetch(`${API}/db/stablecoin/query/stablecoin_supply?limit=1000`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      const d = await res.json();
+      return Array.isArray(d) ? d : d.rows ?? d.entries ?? [];
     },
   },
   {
     id: "btc_dominance",
     label: "btc_dominance_history",
-    tableNames: ["btc_dominance"],
     fetchFn: async () => {
-      const rows = await fetchJson("/db/dominance/query/btc_dominance?limit=1000").catch(() => null);
-      if (rows) return Array.isArray(rows) ? rows : rows.rows || rows.entries || [];
-      return [];
+      const res = await fetch(`${API}/db/dominance/query/btc_dominance?limit=1000`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      const d = await res.json();
+      return Array.isArray(d) ? d : d.rows ?? d.entries ?? [];
     },
   },
   {
     id: "oi_history",
     label: "oi_history",
-    tableNames: ["oi_snapshots"],
     fetchFn: async () => {
-      const d = await fetchJson("/oi-history").catch(() => ({}));
-      // Try direct db query
-      const rows = await fetchJson("/db/oi/query/oi_snapshots?limit=500").catch(() => null);
-      if (rows) return Array.isArray(rows) ? rows : rows.rows || rows.entries || [];
-      // Fallback: return summary
-      return d ? [d] : [];
+      const res = await fetch(`${API}/db/oi/query/oi_snapshots?limit=500`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      const d = await res.json();
+      return Array.isArray(d) ? d : d.rows ?? d.entries ?? [];
     },
   },
 ];
 
-let allRows = [];
-let filteredRows = [];
-let currentPage = 0;
-let sortCol = null;
-let sortDir = 1;
-let activeDb = DATABASES[0];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function fetchJson(path) {
-  const res = await fetch(API_URL + path);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return res.json();
+function fmtCell(col: string, v: unknown): { text: string; cls: string } {
+  if (v === null || v === undefined || v === "") return { text: "—", cls: "text-[#55534B]" };
+  if (col === "date" || col === "stored_at" || col === "baseline_date")
+    return { text: String(v), cls: "font-mono-data text-[#55534B]" };
+  if (typeof v === "number") {
+    const text = Number.isInteger(v) ? v.toLocaleString() : v.toFixed(4);
+    return { text, cls: "font-mono-data text-[#D9A84D] text-right" };
+  }
+  return { text: String(v), cls: "text-[#B8B5AA]" };
 }
 
-function showError(msg) {
-  const b = document.getElementById("errorBox");
-  if (msg) { b.textContent = msg; b.style.display = "block"; }
-  else { b.style.display = "none"; }
-}
+// ─── Main component ───────────────────────────────────────────────────────────
 
-function renderTabs() {
-  document.getElementById("dbTabs").innerHTML = DATABASES.map(db =>
-    `<div class="tab${db.id === activeDb.id ? " active" : ""}" onclick="selectDb('${db.id}')">${db.label}</div>`
-  ).join("");
-}
+export default function DbBrowserPage() {
+  const [activeDb, setActiveDb] = useState<DbConfig>(DATABASES[0]);
+  const [allRows, setAllRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState("");
+  const [page, setPage] = useState(0);
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<1 | -1>(1);
 
-function selectDb(id) {
-  activeDb = DATABASES.find(d => d.id === id);
-  allRows = []; filteredRows = [];
-  renderTabs();
-  const sel = document.getElementById("tableSelect");
-  sel.innerHTML = activeDb.tableNames.map(t => `<option value="${t}">${t}</option>`).join("");
-  document.getElementById("tblWrap").innerHTML = '<div class="status">Click "Load data" to fetch this table.</div>';
-  document.getElementById("paginator").style.display = "none";
-  document.getElementById("metaBar").innerHTML = "";
-  showError("");
-}
-
-async function loadTable() {
-  showError("");
-  document.getElementById("tblWrap").innerHTML = '<div class="thinking"><span class="spinner"></span>Fetching from Railway backend…</div>';
-  document.getElementById("paginator").style.display = "none";
-  document.getElementById("metaBar").innerHTML = "";
-
-  try {
-    allRows = await activeDb.fetchFn();
-    if (!Array.isArray(allRows) || allRows.length === 0) {
-      document.getElementById("tblWrap").innerHTML = '<div class="status">No rows returned — table may be empty or endpoint path differs.</div>';
-      return;
+  const loadTable = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    setAllRows([]);
+    setPage(0);
+    setSortCol(null);
+    try {
+      const rows = await activeDb.fetchFn();
+      if (!rows.length) setError("No rows returned — table may be empty.");
+      setAllRows(rows);
+    } catch (e: unknown) {
+      setError(`Fetch failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setLoading(false);
     }
-    currentPage = 0; sortCol = null;
-    applyFilter();
-  } catch (e) {
-    showError("Fetch failed: " + e.message + ". Check CORS — you may need to add claude.ai to your backend CORS allow_origins list.");
-    document.getElementById("tblWrap").innerHTML = '<div class="status">Could not load data.</div>';
+  }, [activeDb]);
+
+  // Auto-load when tab changes
+  useEffect(() => {
+    setAllRows([]);
+    setFilter("");
+    setError("");
+    setPage(0);
+    setSortCol(null);
+  }, [activeDb]);
+
+  const sorted = useMemo(() => {
+    if (!sortCol) return allRows;
+    return [...allRows].sort((a, b) => {
+      const av = a[sortCol] ?? "";
+      const bv = b[sortCol] ?? "";
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * sortDir;
+      return String(av).localeCompare(String(bv)) * sortDir;
+    });
+  }, [allRows, sortCol, sortDir]);
+
+  const filtered = useMemo(() => {
+    if (!filter) return sorted;
+    const q = filter.toLowerCase();
+    return sorted.filter(r => Object.values(r).some(v => String(v ?? "").toLowerCase().includes(q)));
+  }, [sorted, filter]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const pageRows = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const cols = filtered.length ? Object.keys(filtered[0]) : [];
+
+  const dates = filtered.map(r => r.date as string).filter(Boolean).sort();
+  const dateRange = dates.length >= 2 ? `${dates[0]} → ${dates[dates.length - 1]}` : dates[0] ?? "";
+
+  function handleSort(col: string) {
+    if (sortCol === col) setSortDir(d => (d === 1 ? -1 : 1));
+    else { setSortCol(col); setSortDir(1); }
+    setPage(0);
   }
-}
 
-function applyFilter() {
-  const q = document.getElementById("filterInput").value.toLowerCase();
-  filteredRows = q
-    ? allRows.filter(r => Object.values(r).some(v => String(v ?? "").toLowerCase().includes(q)))
-    : [...allRows];
-  currentPage = 0;
-  renderTable();
-}
-
-document.getElementById("filterInput").addEventListener("input", applyFilter);
-
-function sortBy(col) {
-  if (sortCol === col) sortDir *= -1;
-  else { sortCol = col; sortDir = 1; }
-  filteredRows.sort((a, b) => {
-    const av = a[col] ?? ""; const bv = b[col] ?? "";
-    if (typeof av === "number" && typeof bv === "number") return (av - bv) * sortDir;
-    return String(av).localeCompare(String(bv)) * sortDir;
-  });
-  renderTable();
-}
-
-function renderTable() {
-  if (!filteredRows.length) {
-    document.getElementById("tblWrap").innerHTML = '<div class="status">No matching rows.</div>';
-    document.getElementById("paginator").style.display = "none";
-    return;
+  function exportCSV() {
+    if (!filtered.length) return;
+    const c = Object.keys(filtered[0]);
+    const csv = [
+      c.join(","),
+      ...filtered.map(r =>
+        c.map(k => {
+          const v = String(r[k] ?? "");
+          return v.includes(",") || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
+        }).join(",")
+      ),
+    ].join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `${activeDb.id}.csv`;
+    a.click();
   }
-  const cols = Object.keys(filteredRows[0]);
-  const start = currentPage * PAGE_SIZE;
-  const pageRows = filteredRows.slice(start, start + PAGE_SIZE);
-  const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE);
 
-  const heads = cols.map(c => {
-    const arrow = sortCol === c ? (sortDir > 0 ? " ↑" : " ↓") : "";
-    return `<th onclick="sortBy('${c}')">${c}${arrow}</th>`;
-  }).join("");
+  return (
+    <main className="min-h-screen bg-ink font-sans-body" style={{ background: "#0B0B0C" }}>
+      {/* Nav bar */}
+      <div className="hairline-b px-6 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #22231F" }}>
+        <div className="flex items-center gap-6">
+          <span className="font-display-italic text-amber-sand text-[18px]" style={{ fontFamily: "'Instrument Serif', serif", fontStyle: "italic", color: "#D9A84D" }}>
+            ⬡
+          </span>
+          <span className="caps-sm text-faint" style={{ color: "#55534B", letterSpacing: "0.18em", textTransform: "uppercase", fontSize: 10 }}>
+            BTC Dashboard
+          </span>
+          <a href="/" className="caps-sm" style={{ color: "#55534B", fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", textDecoration: "none" }}>
+            ← back to dashboard
+          </a>
+        </div>
+        <span className="caps-sm" style={{ color: "#55534B", fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase" }}>
+          Database Browser
+        </span>
+      </div>
 
-  const rows = pageRows.map(row => {
-    const cells = cols.map(c => {
-      const v = row[c];
-      if (v === null || v === undefined || v === "") return `<td class="null-col">—</td>`;
-      if (c === "date" || c === "stored_at" || c === "baseline_date") return `<td class="date-col">${v}</td>`;
-      if (typeof v === "number") {
-        const fmt = Number.isInteger(v) ? v.toLocaleString() : v.toFixed(4);
-        return `<td class="num-col">${fmt}</td>`;
-      }
-      return `<td class="str-col" title="${String(v)}">${String(v)}</td>`;
-    }).join("");
-    return `<tr>${cells}</tr>`;
-  }).join("");
+      <div className="px-6 py-6" style={{ maxWidth: 1400, margin: "0 auto" }}>
 
-  document.getElementById("tblWrap").innerHTML = `
-    <table>
-      <thead><tr>${heads}</tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+        {/* Page title */}
+        <div className="mb-6">
+          <h1 className="font-display text-paper text-[22px]" style={{ fontFamily: "'Instrument Serif', serif", color: "#E8E4D9" }}>
+            SQLite Database Browser
+          </h1>
+          <p className="font-sans-body text-faint text-[13px] mt-1" style={{ color: "#55534B" }}>
+            View all collected data across your Railway-hosted SQLite stores.
+          </p>
+        </div>
 
-  // Meta bar
-  const dates = filteredRows.map(r => r.date).filter(Boolean).sort();
-  const dateRange = dates.length >= 2 ? `${dates[0]} → ${dates[dates.length-1]}` : (dates[0] || "");
-  document.getElementById("metaBar").innerHTML = `
-    <span class="badge count">${filteredRows.length.toLocaleString()} rows</span>
-    ${dateRange ? `<span class="badge dates">${dateRange}</span>` : ""}
-    <span class="meta-txt">${cols.length} columns</span>
-    ${filteredRows.length < allRows.length ? `<span class="meta-txt">(filtered from ${allRows.length})</span>` : ""}
-  `;
+        {/* DB tabs */}
+        <div className="flex gap-2 flex-wrap mb-5">
+          {DATABASES.map(db => (
+            <button
+              key={db.id}
+              onClick={() => setActiveDb(db)}
+              style={{
+                padding: "4px 14px",
+                fontSize: 11,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                borderRadius: 99,
+                border: activeDb.id === db.id
+                  ? "1px solid rgba(217,168,77,0.35)"
+                  : "1px solid #22231F",
+                background: activeDb.id === db.id
+                  ? "rgba(217,168,77,0.08)"
+                  : "#131315",
+                color: activeDb.id === db.id ? "#D9A84D" : "#55534B",
+                cursor: "pointer",
+                fontFamily: "'IBM Plex Mono', monospace",
+              }}
+            >
+              {db.label}
+            </button>
+          ))}
+        </div>
 
-  // Pagination
-  const pag = document.getElementById("paginator");
-  if (totalPages > 1) {
-    pag.style.display = "flex";
-    document.getElementById("prevBtn").disabled = currentPage === 0;
-    document.getElementById("nextBtn").disabled = currentPage >= totalPages - 1;
-    document.getElementById("pageInfo").textContent = `Page ${currentPage + 1} of ${totalPages}  (rows ${start + 1}–${Math.min(start + PAGE_SIZE, filteredRows.length)})`;
-  } else {
-    pag.style.display = "none";
-  }
+        {/* Toolbar */}
+        <div className="flex gap-2 flex-wrap items-center mb-4">
+          <input
+            type="text"
+            value={filter}
+            onChange={e => { setFilter(e.target.value); setPage(0); }}
+            placeholder="Filter rows…"
+            style={{
+              flex: 1, minWidth: 180, height: 34, padding: "0 10px",
+              fontSize: 13, background: "#131315",
+              border: "1px solid #22231F", borderRadius: 6,
+              color: "#E8E4D9", outline: "none",
+              fontFamily: "'IBM Plex Sans', sans-serif",
+            }}
+          />
+          <button
+            onClick={loadTable}
+            disabled={loading}
+            style={{
+              height: 34, padding: "0 16px", fontSize: 12, fontWeight: 500,
+              background: "rgba(217,168,77,0.10)", color: "#D9A84D",
+              border: "1px solid rgba(217,168,77,0.3)", borderRadius: 6, cursor: "pointer",
+              fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.05em",
+            }}
+          >
+            {loading ? "Loading…" : "Load data"}
+          </button>
+          <button
+            onClick={exportCSV}
+            disabled={!filtered.length}
+            style={{
+              height: 34, padding: "0 14px", fontSize: 12,
+              background: "#131315", color: "#8A8780",
+              border: "1px solid #22231F", borderRadius: 6, cursor: "pointer",
+              fontFamily: "'IBM Plex Mono', monospace",
+            }}
+          >
+            ↓ CSV
+          </button>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div style={{
+            padding: "10px 14px", marginBottom: 12,
+            background: "rgba(196,97,74,0.08)", border: "1px solid rgba(196,97,74,0.2)",
+            color: "#C4614A", borderRadius: 6, fontSize: 12,
+            fontFamily: "'IBM Plex Mono', monospace",
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Meta bar */}
+        {filtered.length > 0 && (
+          <div className="flex gap-3 items-center flex-wrap mb-3">
+            <span style={{
+              fontSize: 11, padding: "2px 9px", borderRadius: 99,
+              background: "rgba(217,168,77,0.10)", color: "#D9A84D",
+              fontFamily: "'IBM Plex Mono', monospace",
+            }}>
+              {filtered.length.toLocaleString()} rows
+            </span>
+            {dateRange && (
+              <span style={{
+                fontSize: 11, padding: "2px 9px", borderRadius: 99,
+                background: "rgba(255,255,255,0.04)", color: "#55534B",
+                fontFamily: "'IBM Plex Mono', monospace",
+              }}>
+                {dateRange}
+              </span>
+            )}
+            <span style={{ fontSize: 11, color: "#55534B", fontFamily: "'IBM Plex Mono', monospace" }}>
+              {cols.length} columns
+            </span>
+            {filtered.length < allRows.length && (
+              <span style={{ fontSize: 11, color: "#55534B" }}>
+                (filtered from {allRows.length.toLocaleString()})
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Table */}
+        <div style={{ overflowX: "auto", border: "1px solid #1A1A1C", borderRadius: 8, background: "#0E0E10" }}>
+          {loading ? (
+            <div style={{ padding: 48, textAlign: "center", color: "#55534B", fontSize: 13 }}>
+              Fetching from Railway backend…
+            </div>
+          ) : !allRows.length ? (
+            <div style={{ padding: 48, textAlign: "center", color: "#55534B", fontSize: 13 }}>
+              {error ? "Could not load data." : "Select a database tab and click Load data."}
+            </div>
+          ) : pageRows.length === 0 ? (
+            <div style={{ padding: 48, textAlign: "center", color: "#55534B", fontSize: 13 }}>
+              No rows match filter.
+            </div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #1A1A1C" }}>
+                  {cols.map(col => (
+                    <th
+                      key={col}
+                      onClick={() => handleSort(col)}
+                      style={{
+                        padding: "8px 12px", textAlign: "left",
+                        fontSize: 10, fontWeight: 500, color: "#55534B",
+                        whiteSpace: "nowrap", textTransform: "uppercase",
+                        letterSpacing: "0.1em", background: "#0E0E10",
+                        cursor: "pointer", userSelect: "none",
+                        fontFamily: "'IBM Plex Mono', monospace",
+                      }}
+                    >
+                      {col}
+                      {sortCol === col && (
+                        <span style={{ marginLeft: 4, color: "#D9A84D" }}>
+                          {sortDir === 1 ? "↑" : "↓"}
+                        </span>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((row, i) => (
+                  <tr
+                    key={i}
+                    style={{ borderBottom: "1px solid #161618" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#131315")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >
+                    {cols.map(col => {
+                      const { text, cls } = fmtCell(col, row[col]);
+                      return (
+                        <td
+                          key={col}
+                          title={text !== "—" ? text : undefined}
+                          style={{
+                            padding: "6px 12px",
+                            whiteSpace: "nowrap",
+                            maxWidth: 260,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            fontFamily: cls.includes("mono") ? "'IBM Plex Mono', monospace" : "'IBM Plex Sans', sans-serif",
+                            color: cls.includes("D9A84D") ? "#D9A84D"
+                              : cls.includes("55534B") ? "#55534B"
+                              : cls.includes("B8B5AA") ? "#B8B5AA"
+                              : "#8A8780",
+                            textAlign: cls.includes("right") ? "right" : "left",
+                          }}
+                        >
+                          {text}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              style={{
+                height: 30, padding: "0 12px", fontSize: 12,
+                background: "#131315", color: page === 0 ? "#2a2a2b" : "#8A8780",
+                border: "1px solid #22231F", borderRadius: 6,
+                cursor: page === 0 ? "default" : "pointer",
+              }}
+            >
+              ‹ Prev
+            </button>
+            <span style={{ flex: 1, textAlign: "center", fontSize: 12, color: "#55534B", fontFamily: "'IBM Plex Mono', monospace" }}>
+              Page {page + 1} of {totalPages} · rows {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length.toLocaleString()}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              style={{
+                height: 30, padding: "0 12px", fontSize: 12,
+                background: "#131315", color: page >= totalPages - 1 ? "#2a2a2b" : "#8A8780",
+                border: "1px solid #22231F", borderRadius: 6,
+                cursor: page >= totalPages - 1 ? "default" : "pointer",
+              }}
+            >
+              Next ›
+            </button>
+          </div>
+        )}
+
+      </div>
+    </main>
+  );
 }
-
-function changePage(delta) {
-  const total = Math.ceil(filteredRows.length / PAGE_SIZE);
-  currentPage = Math.max(0, Math.min(currentPage + delta, total - 1));
-  renderTable();
-}
-
-function exportCSV() {
-  if (!filteredRows.length) return;
-  const cols = Object.keys(filteredRows[0]);
-  const csv = [cols.join(","), ...filteredRows.map(r =>
-    cols.map(c => {
-      const v = r[c] ?? "";
-      return typeof v === "string" && (v.includes(",") || v.includes('"')) ? `"${v.replace(/"/g,'""')}"` : v;
-    }).join(",")
-  )].join("\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"}));
-  a.download = `${activeDb.id}.csv`;
-  a.click();
-}
-
-// Init
-renderTabs();
-selectDb(DATABASES[0].id);
-</script>
-</body>
-</html>
