@@ -1538,7 +1538,7 @@ return (
           )}
 
 {/* North American Premium */}
-<SectionLabel number="XII" label="North American BTC Premium" />
+<SectionLabel numeral="XII" title="North American BTC Premium" />
 <PremiumCard data={premiumData} />
           
           {/* Section XII — Crypto Proxy Stocks */}
