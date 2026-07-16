@@ -15,7 +15,8 @@ import {
 import TradingViewEmbed from "./components/TradingViewEmbed";
 import TradingViewCME from "./components/TradingViewCME";
 import { NavLinks } from "./components/DashboardNav";
-import { SpotDepthCard } from "./SpotDepthCard";
+import SpotDepthCard from "./components/SpotDepthCard";
+import type { SpotDepthData } from "./components/SpotDepthCard";
 
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -82,47 +83,7 @@ type EtfAumData = {
   updated_at:    string;
 };
 
-type SpotDepthData = {
-  name: string;
-  category: string;
-  current: string;                     // adjusted coverage ratio e.g. "1.34x"
-  current_dir: "up" | "down" | "flat";
-  alert: string;
-  alert_level: AlertLevel;
-  pattern: string;                     // cascade risk label
- 
-  spot_price_usd: number;
-  bid_depth_0_5pct_usd: string;
-  bid_depth_1_0pct_usd: string;
-  bid_depth_2_0pct_usd: string;
-  ask_depth_2_0pct_usd: string;
-  visible_depth_usd: string;
-  adjusted_depth_usd: string;
-  depth_haircut_pct: string;
-  haircut_reason: "stressed" | "normal";
- 
-  depth_coverage_ratio: number;
-  adjusted_coverage: number;
- 
-  liquidation_estimate_usd: string;
-  liquidation_source: string;
-  oi_usd: string;
- 
-  slippage_estimate: string;
-  depth_vs_median_pct: number | null;
-  venue_concentration_pct: number;
-  venues_online: string[];
- 
-  cascade_risk_label: string;
-  cascade_risk_level: AlertLevel;
- 
-  oi_alert_level: AlertLevel;
-  funding_alert_level: AlertLevel;
- 
-  venue_breakdown: Record<string, VenueBreakdown>;
- 
-  updated_at: string;
-};
+
 
 const INITIAL_TRADE_LOGS = [
   { date: "Oct 26", structure: "Range high test", read: "Absorption at $67.8k", plan: "Scale in, tight invalidation", result: "Pending", bias: "—" },
@@ -1299,10 +1260,10 @@ export default function BTCDecisionDashboard() {
       const execRes     = await fetch(`${API}/trade-execution`); const execData     = await execRes.json();     if (Array.isArray(execData)) setExecutions(execData);
       if (data["stablecoin_supply"]) setStablecoinData(data["stablecoin_supply"] as StablecoinData);
       if (data["btc_dominance"])     setDominanceData(data["btc_dominance"] as DominanceData);
-      const depthRes = await fetch(`${API}/liquidity/depth`);
-      const depthJson = await depthRes.json();
-      if (!depthJson.error) setSpotDepth(depthJson);
-         } catch (e) { console.warn("Depth fetch failed", e); 
+      const depthRes  = await fetch(`${API}/liquidity/depth`);
+  const depthJson = await depthRes.json();
+  if (!depthJson.error) setSpotDepth(depthJson);
+} catch (e) { console.warn("[SpotDepth] fetch failed", e); }
       // Proxy stocks — intentionally not awaited (slow yFinance calls, 5-min backend cache)
       fetch(`${API}/crypto-proxies`)
         .then(r => r.json())
@@ -1460,7 +1421,8 @@ return (
 
           {/* Spot chart */}
           <section><TradingViewEmbed /></section>
-          <section>spotDepth && <SpotDepthCard data={spotDepth} /></section>
+          <SectionLabel numeral="0" title="Spot Depth for Liquidity Cascade Risk" />
+          {spotDepth && <SpotDepthCard data={spotDepth} />}
 
           {/* Section I — Market state snapshot */}
           <section>
