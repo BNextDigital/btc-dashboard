@@ -35,6 +35,9 @@ type Metric = {
   spread_label?: string;
   high_exchange?: string;
   low_exchange?: string;
+  // add to Metric type
+  source?: string;
+  last_date?: string;
 };
 
 type StablecoinData = {
@@ -183,7 +186,8 @@ const MetricCard = ({ metric, index }: { metric: Metric; index: number }) => {
     metric._is_historical       ? `Historical · ${metric._date}` :
     metric._is_override         ? "Manual · screenshot" :
     metric._is_history_fallback ? `Backfill · ${metric.updated}` :
-    `Updated ${metric.updated}`;
+    metric.source               ? `${metric.source} · ${metric.updated}` :
+  `Updated ${metric.updated}`;
 
   return (
     <div
@@ -1289,7 +1293,8 @@ export default function BTCDecisionDashboard() {
             alertLevel:     m.alert_level    as "extreme" | "notable" | "neutral" | "none",
             pattern:        m.pattern        as string,
             spark:          (m.spark         as number[]) ?? [],
-            updated:        "just now",
+            updated:        (m.last_date as string) ?? "just now",
+            source:         (m.source    as string) ?? undefined,
             _is_override:   (m._is_override  ?? false) as boolean,
             _is_history_fallback: (m._is_history_fallback ?? false) as boolean,
             exchange_rates: (m.exchange_rates ?? {})   as Record<string, number>,
