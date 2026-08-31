@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -13,14 +13,18 @@ import {
   Minus,
 } from "lucide-react";
 import TradingViewEmbed from "./components/TradingViewEmbed";
-import TradingViewCME from "./components/TradingViewCME";
 import { NavLinks } from "./components/DashboardNav";
 import SpotDepthCard from "./components/SpotDepthCard";
 import type { SpotDepthData } from "./components/SpotDepthCard";
 
 
 const API = process.env.NEXT_PUBLIC_API_URL;
-const METRICS_CACHE_KEY = "btc_metrics_v1";
+const METRICS_CACHE_KEY = "btc_dashboard_v2";
+
+const PRICE_REFRESH_MS = 60_000;
+const FAST_REFRESH_MS = 15 * 60_000;
+const MARKET_REFRESH_MS = 30 * 60_000;
+const HOURLY_REFRESH_MS = 60 * 60_000;
 
 type Metric = {
   id: string; name: string; category: string; current: string;
@@ -87,13 +91,109 @@ type EtfAumData = {
   updated_at:    string;
 };
 
+type SummaryData = {
+  structure: string;
+  extreme_count: number;
+  notable_count: number;
+  active_alerts: Array<{
+    metric: string;
+    alert: string;
+    level: string;
+    current: string;
+  }>;
+};
+
+type NewsItem = {
+  title: string;
+  source: string;
+  time: string;
+  tag: string;
+  url: string;
+};
+
+type CausalData = {
+  chain: Array<{ label: string; state: string; weight: string }>;
+  contradiction: string;
+};
+
+type PriceData = {
+  price: string;
+  change_24h: string;
+};
+
+async function fetchJson<T>(path: string): Promise<T> {
+  if (!API) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+  }
+
+  const response = await fetch(`${API}${path}`, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error(`${path} returned ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+function updateDashboardCache(patch: Record<string, unknown>) {
+  try {
+    const raw = localStorage.getItem(METRICS_CACHE_KEY);
+    const current = raw ? JSON.parse(raw) : {};
+
+    localStorage.setItem(
+      METRICS_CACHE_KEY,
+      JSON.stringify({
+        ...current,
+        ...patch,
+        ts: Date.now(),
+      }),
+    );
+  } catch {
+    // localStorage may be unavailable or full. The live dashboard still works.
+  }
+}
+
+function transformMetricsPayload(data: Record<string, unknown>): Metric[] {
+  return Object.entries(data)
+    .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance")
+    .map(([id, raw]) => {
+      const m = raw as Record<string, unknown>;
+
+      return {
+        id,
+        name: m.name as string,
+        category: m.category as string,
+        current: m.current as string,
+        currentDir: m.current_dir as "up" | "down" | "flat",
+        d7: m.d7 as string,
+        vs30d: m.vs30d as string,
+        d30: (m.d30 as string) ?? undefined,
+        percentile: m.percentile as number,
+        alert: m.alert as string,
+        alertLevel: m.alert_level as
+          | "extreme"
+          | "notable"
+          | "neutral"
+          | "none",
+        pattern: m.pattern as string,
+        spark: (m.spark as number[]) ?? [],
+        updated: (m.last_date as string) ?? "just now",
+        source: (m.source as string) ?? undefined,
+        _is_override: (m._is_override ?? false) as boolean,
+        _is_history_fallback: (m._is_history_fallback ?? false) as boolean,
+        exchange_rates: (m.exchange_rates ?? {}) as Record<string, number>,
+        spread: (m.spread ?? 0) as number,
+        spread_label: (m.spread_label ?? "") as string,
+        high_exchange: (m.high_exchange ?? "") as string,
+        low_exchange: (m.low_exchange ?? "") as string,
+      };
+    });
+}
 
 
-const INITIAL_TRADE_LOGS = [
-  { date: "Oct 26", structure: "Range high test", read: "Absorption at $67.8k", plan: "Scale in, tight invalidation", result: "Pending", bias: "—" },
-  { date: "Oct 21", structure: "Breakout retest", read: "Funding too hot", plan: "Skip", result: "Correct skip", bias: "Patience held" },
-  { date: "Oct 14", structure: "Bull flag", read: "Clean structure", plan: "Enter, trail stop", result: "+4.2%", bias: "Trimmed early" },
-];
+
+
+
 
 const alertClasses = (level: string) => {
   switch (level) {
@@ -540,7 +640,7 @@ const ProxyStockCard = ({ stock }: { stock: ProxyStock }) => {
 };
 
 const CorrelationMatrix = ({ stocks }: { stocks: ProxyStock[] }) => {
-  const sorted = [...stocks].sort((a, b) => b.corr_30d - a.corr_30d);
+  const sorted = stocks;
   return (
     <div className="bg-surface border hairline">
       <div className="grid grid-cols-12 caps-sm text-faint px-5 py-2.5 hairline-b bg-surface-inset">
@@ -1029,7 +1129,7 @@ const EtfAumCard = ({ data }: { data: EtfAumData }) => {
 
 
 
-type TradeLog = { date: string; structure: string; read: string; plan: string; result: string; bias: string };
+type TradeLog = { date: string; structure: string; read: string; plan: string; result: string; bias: string; btc_price?: string };
 
 const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }) => {
   const [showForm, setShowForm] = useState(false); const [saving, setSaving] = useState(false); const [saveError, setSaveError] = useState<string | null>(null);
@@ -1046,7 +1146,7 @@ const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }
       <div className="flex items-center justify-between px-5 py-4 hairline-b"><div><div className="caps-sm text-faint">IV</div><h2 className="font-display text-paper text-[22px] leading-tight mt-0.5">Review & notes</h2></div><div className="flex items-center gap-4"><span className="caps-sm text-faint">{logs.length} entries</span><button onClick={() => setShowForm(!showForm)} className={`caps-sm px-3 py-1.5 border transition-colors ${showForm ? "border-amber-sand bg-amber-sand-10 text-amber-sand" : "hairline text-muted hover:text-paper hover:border-amber-sand"}`}>{showForm ? "Cancel" : "New entry"}</button></div></div>
       {showForm && (<div className="px-5 py-4 hairline-b bg-surface-2"><div className="mb-4"><div className="caps-sm text-amber-sand mb-1">Log a trade decision</div><p className="font-sans-body text-muted text-[11px]">Record what the market looked like, what you decided, and why.</p></div>{saveError && <div className="bg-extreme-10 border border-extreme px-3 py-2 mb-3"><span className="caps-sm text-alert-extreme">{saveError}</span></div>}<div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">{formFields.map((f) => (<div key={f.key}><label className="caps-sm text-faint block mb-1.5">{f.label}</label><textarea rows={2} value={form[f.key]} onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))} placeholder={f.placeholder} className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-sans-body resize-none" /></div>))}</div><div className="flex justify-end gap-3"><button onClick={() => setShowForm(false)} className="caps-sm px-3 py-1.5 hairline text-muted hover:text-paper border transition-colors">Cancel</button><button onClick={handleSave} disabled={saving} className={`caps-sm px-3 py-1.5 border transition-colors ${saving ? "border-faint text-faint cursor-not-allowed" : "border-amber-sand text-amber-sand hover:bg-amber-sand-10"}`}>{saving ? "Saving…" : "Log This Trade"}</button></div></div>)}
       <div className="grid grid-cols-12 caps-sm text-faint px-5 py-2.5 hairline-b bg-surface-inset"><div className="col-span-1">Date</div><div className="col-span-1">Price</div><div className="col-span-2">Structure</div><div className="col-span-3">Read</div><div className="col-span-2">Plan</div><div className="col-span-2">Result</div><div className="col-span-1">Bias</div></div>
-      {logs.length === 0 ? <div className="px-5 py-8 text-center"><span className="caps-sm text-faint">No entries yet — add your first trade log above</span></div> : logs.map((log, i) => (<div key={i} className={`grid grid-cols-12 px-5 py-3 text-[12px] font-sans-body items-center ${i < logs.length - 1 ? "hairline-b" : ""} hover:bg-surface-2 transition-colors`}><div className="col-span-1 font-mono-data text-paper-2">{log.date}</div><div className="col-span-1 font-mono-data text-faint text-[10px]">{(log as any).btc_price ?? "—"}</div><div className="col-span-2 text-paper">{log.structure}</div><div className="col-span-3 text-paper-2 italic">{log.read}</div><div className="col-span-2 text-paper-2">{log.plan}</div><div className={`col-span-2 font-mono-data ${log.result?.startsWith("+") ? "text-neutral-sage" : log.result?.startsWith("-") ? "text-alert-extreme" : "text-muted"}`}>{log.result ?? "Open"}</div><div className="col-span-1 caps-sm text-faint">{log.bias ?? "—"}</div></div>))}
+      {logs.length === 0 ? <div className="px-5 py-8 text-center"><span className="caps-sm text-faint">No entries yet — add your first trade log above</span></div> : logs.map((log, i) => (<div key={i} className={`grid grid-cols-12 px-5 py-3 text-[12px] font-sans-body items-center ${i < logs.length - 1 ? "hairline-b" : ""} hover:bg-surface-2 transition-colors`}><div className="col-span-1 font-mono-data text-paper-2">{log.date}</div><div className="col-span-1 font-mono-data text-faint text-[10px]">{log.btc_price ?? "—"}</div><div className="col-span-2 text-paper">{log.structure}</div><div className="col-span-3 text-paper-2 italic">{log.read}</div><div className="col-span-2 text-paper-2">{log.plan}</div><div className={`col-span-2 font-mono-data ${log.result?.startsWith("+") ? "text-neutral-sage" : log.result?.startsWith("-") ? "text-alert-extreme" : "text-muted"}`}>{log.result ?? "Open"}</div><div className="col-span-1 caps-sm text-faint">{log.bias ?? "—"}</div></div>))}
       <div className="px-5 py-4 hairline-t flex items-center justify-between bg-surface-inset"><div className="flex items-center gap-2 text-faint"><FileText size={12} /><span className="caps-sm">Post-trade SEM review · run weekly with Claude</span></div><button className="caps-sm text-amber-sand hover:underline flex items-center gap-1">Run review <ChevronRight size={11} /></button></div>
     </div>
   );
@@ -1152,11 +1252,52 @@ function PremiumCard({ data }: { data: any }) {
   )
 }
 
-const Header = ({ price, change24h, onFlushCache, flushing }: { 
-  price: string; 
+const LiveClock = ({
+  utc = false,
+  includeDate = false,
+}: {
+  utc?: boolean;
+  includeDate?: boolean;
+}) => {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const options: Intl.DateTimeFormatOptions = includeDate
+    ? {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        ...(utc ? { timeZone: "UTC", timeZoneName: "short" } : {}),
+      }
+    : {
+        hour: "2-digit",
+        minute: "2-digit",
+        ...(utc ? { timeZone: "UTC" } : {}),
+      };
+
+  return (
+    <span className="caps-sm text-faint" suppressHydrationWarning>
+      {now.toLocaleString("en-US", options)}
+    </span>
+  );
+};
+
+const Header = ({
+  price,
+  change24h,
+  onRefresh,
+  refreshing,
+}: {
+  price: string;
   change24h: string;
-  onFlushCache: () => void;
-  flushing: boolean;
+  onRefresh: () => void;
+  refreshing: boolean;
 }) => (
   <header className="hairline-b">
     <div className="max-w-[1440px] mx-auto px-8 py-5 flex items-center justify-between">
@@ -1166,18 +1307,34 @@ const Header = ({ price, change24h, onFlushCache, flushing }: {
       </div>
       <div className="flex items-center gap-6">
         <nav className="flex items-center gap-1">
-        <NavLinks current="btc" />
+          <NavLinks current="btc" />
         </nav>
-        <div className="text-right"><div className="caps-sm text-faint">Spot</div><div className="font-mono-data text-paper text-[15px]">{price} <span className={`text-[12px] ${(change24h ?? "+").startsWith("+") ? "text-neutral-sage" : "text-alert-extreme"}`}>{change24h}</span></div></div>
-        <div className="text-right hidden sm:block"><div className="caps-sm text-faint">Snapshot</div><div className="font-mono-data text-paper-2 text-[12px]" suppressHydrationWarning>{new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" })}</div></div>
+        <div className="text-right">
+          <div className="caps-sm text-faint">Spot</div>
+          <div className="font-mono-data text-paper text-[15px]">
+            {price}{" "}
+            <span className={`text-[12px] ${(change24h ?? "+").startsWith("+") ? "text-neutral-sage" : "text-alert-extreme"}`}>
+              {change24h}
+            </span>
+          </div>
+        </div>
+        <div className="text-right hidden sm:block">
+          <div className="caps-sm text-faint">UTC</div>
+          <div className="font-mono-data text-paper-2 text-[12px]">
+            <LiveClock utc includeDate />
+          </div>
+        </div>
         <button
-          onClick={onFlushCache}
-          disabled={flushing}
+          onClick={onRefresh}
+          disabled={refreshing}
           className="caps-sm text-faint hover:text-paper transition-colors disabled:opacity-40"
-       >
-          {flushing ? "flushing…" : "↺ flush"}
+        >
+          {refreshing ? "refreshing…" : "↺ refresh"}
         </button>
-        <div className="flex items-center gap-1.5 pl-4 border-l hairline"><Circle size={7} fill="#8DA078" stroke="none" className="pulse-dot" /><span className="caps-sm text-neutral-sage">Live</span></div>
+        <div className="flex items-center gap-1.5 pl-4 border-l hairline">
+          <Circle size={7} fill="#8DA078" stroke="none" className="pulse-dot" />
+          <span className="caps-sm text-neutral-sage">Live</span>
+        </div>
       </div>
     </div>
   </header>
@@ -1193,24 +1350,37 @@ const SectionLabel = ({ numeral, title, subtitle }: { numeral: string; title: st
 export default function BTCDecisionDashboard() {
   // ── State ────────────────────────────────────────────────────────────────
   const [judgment, setJudgment] = useState<JudgmentState>({ read: "", supports: "", contradicts: "", invalidates: "", plan: "", risk: null });
-  const [logs, setLogs]         = useState<TradeLog[]>(INITIAL_TRADE_LOGS);
-  const [now, setNow]           = useState(new Date());
+  const [logs, setLogs]         = useState<TradeLog[]>([]);
   const [metrics, setMetrics]   = useState<Metric[]>([]);
   const [stablecoinData, setStablecoinData] = useState<StablecoinData | null>(null);
   const [dominanceData, setDominanceData]   = useState<DominanceData | null>(null);
   const [premiumData, setPremiumData] = useState<any>(null)
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
-  const [price, setPrice] = useState<{ price: string; change_24h: string }>({ price: "–", change_24h: "+" });
-  const [summary, setSummary]   = useState<{ structure: string; extreme_count: number; notable_count: number; active_alerts: Array<{ metric: string; alert: string; level: string; current: string }> } | null>(null);
-  const [news, setNews]         = useState<Array<{ title: string; source: string; time: string; tag: string; url: string }>>([]);
-  const [causal, setCausal]     = useState<{ chain: Array<{ label: string; state: string; weight: string }>; contradiction: string } | null>(null);
+  const [price, setPrice] = useState<PriceData>({ price: "–", change_24h: "+" });
+  const [summary, setSummary]   = useState<SummaryData | null>(null);
+  const [news, setNews]         = useState<NewsItem[]>([]);
+  const [causal, setCausal]     = useState<CausalData | null>(null);
   const [executions, setExecutions] = useState<any[]>([]);
   const [proxyStocks, setProxyStocks] = useState<ProxyStock[]>([]);
   const [fromCache, setFromCache] = useState(false);
-  const [flushing, setFlushing]   = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [etfAum, setEtfAum]       = useState<EtfAumData | null>(null);
   const [spotDepth, setSpotDepth] = useState<SpotDepthData | null>(null);
+  const inFlightRef = useRef({
+    price: false,
+    fast: false,
+    market: false,
+    hourly: false,
+    user: false,
+  });
+
+  const lastRefreshRef = useRef({
+    price: 0,
+    fast: 0,
+    market: 0,
+    hourly: 0,
+  });
  
   // ── Date picker state ────────────────────────────────────────────────────
   const [selectedDate, setSelectedDate]                 = useState<string>("");
@@ -1222,136 +1392,372 @@ export default function BTCDecisionDashboard() {
 
  
  
-  // ── Clock tick ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(id);
-  }, []);
- 
-  // ── Render cached data immediately on mount ──────────────────────────────
+  // ── Restore cached dashboard state immediately ───────────────────────────
   useEffect(() => {
     try {
       const raw = localStorage.getItem(METRICS_CACHE_KEY);
       if (!raw) return;
+
       const cached = JSON.parse(raw);
-      if (cached.metrics)    setMetrics(cached.metrics);
-      if (cached.stablecoin) setStablecoinData(cached.stablecoin);
-      if (cached.dominance)  setDominanceData(cached.dominance);
-      if (cached.price)      setPrice(cached.price);
-      if (cached.summary)    setSummary(cached.summary);
-      if (cached.news)       setNews(cached.news);
-      setLoading(false);
-      setFromCache(true);
-    } catch (e) {
-      // ignore — cache miss or parse error
-    }
-  }, []);
- 
-  // ── Main data fetch ───────────────────────────────────────────────────────
-  const fetchAll = useCallback(async () => {
-    try {
-      setLoading(true); setError(null);
-      const metricsRes = await fetch(`${API}/metrics`);
-      if (!metricsRes.ok) throw new Error(`Backend returned ${metricsRes.status}`);
-      const data = await metricsRes.json();
-      const [priceRes, summaryRes] = await Promise.all([fetch(`${API}/price`), fetch(`${API}/summary`)]);
-      const newsRes   = await fetch(`${API}/news`);   const newsData   = await newsRes.json();   if (newsData.items) setNews(newsData.items);
-      const causalRes = await fetch(`${API}/causal`); const causalData = await causalRes.json(); setCausal(causalData);
-      const priceData   = await priceRes.json();
-      const premiumRes = await fetch(`${API}/btc-premium`)
-      const premiumJson = await premiumRes.json()
-      setPremiumData(premiumJson)
-      const summaryData = await summaryRes.json();
-      const tradeLogRes = await fetch(`${API}/trade-log`);       const tradeLogData = await tradeLogRes.json(); if (Array.isArray(tradeLogData) && tradeLogData.length > 0) setLogs(tradeLogData);
-      const execRes     = await fetch(`${API}/trade-execution`); const execData     = await execRes.json();     if (Array.isArray(execData)) setExecutions(execData);
-      if (data["stablecoin_supply"]) setStablecoinData(data["stablecoin_supply"] as StablecoinData);
-      if (data["btc_dominance"])     setDominanceData(data["btc_dominance"] as DominanceData);
-     // Inside the outer try block, alongside the other fetches:
-    const depthRes = await fetch(`${API}/liquidity/depth`).catch(() => null);
-    if (depthRes?.ok) {
-      const depthJson = await depthRes.json().catch(() => null);
-      if (depthJson && !depthJson.error) setSpotDepth(depthJson);
-    }
-      // Proxy stocks — intentionally not awaited (slow yFinance calls, 5-min backend cache)
-      fetch(`${API}/crypto-proxies`)
-        .then(r => r.json())
-        .then(d => { if (d.crypto_proxies) setProxyStocks(Object.values(d.crypto_proxies) as ProxyStock[]); })
-        .catch(err => console.error("[proxy stocks]", err));
-      fetch(`${API}/etf-aum/metrics`).then(r => r.ok ? r.json() : null).then(d => { if (d) setEtfAum(d); }).catch(() => {});
-      const transformed: Metric[] = Object.entries(data)
-        .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance")
-        .map(([id, raw]) => {
-          const m = raw as Record<string, unknown>;
-          return {
-            id,
-            name:           m.name           as string,
-            category:       m.category       as string,
-            current:        m.current        as string,
-            currentDir:     m.current_dir    as "up" | "down" | "flat",
-            d7:             m.d7             as string,
-            vs30d:          m.vs30d          as string,
-            d30: (m.d30 as string) ?? undefined,
-            percentile:     m.percentile     as number,
-            alert:          m.alert          as string,
-            alertLevel:     m.alert_level    as "extreme" | "notable" | "neutral" | "none",
-            pattern:        m.pattern        as string,
-            spark:          (m.spark         as number[]) ?? [],
-            updated:        (m.last_date as string) ?? "just now",
-            source:         (m.source    as string) ?? undefined,
-            _is_override:   (m._is_override  ?? false) as boolean,
-            _is_history_fallback: (m._is_history_fallback ?? false) as boolean,
-            exchange_rates: (m.exchange_rates ?? {})   as Record<string, number>,
-            spread:         (m.spread        ?? 0)     as number,
-            spread_label:   (m.spread_label  ?? "")    as string,
-            high_exchange:  (m.high_exchange ?? "")    as string,
-            low_exchange:   (m.low_exchange  ?? "")    as string,
-          };
-        });
-      // Persist to localStorage for instant render on next load
-      try {
-        localStorage.setItem(METRICS_CACHE_KEY, JSON.stringify({
-          metrics:    transformed,
-          stablecoin: data["stablecoin_supply"] ?? null,
-          dominance:  data["btc_dominance"]     ?? null,
-          price:      priceData,
-          summary:    summaryData,
-          news:       newsData.items ?? [],
-          ts:         Date.now(),
-        }));
-      } catch (e) {
-        // ignore — storage full or disabled
+      let restored = false;
+
+      if (cached.metrics) {
+        setMetrics(cached.metrics);
+        restored = true;
       }
-      setFromCache(false);
-      setMetrics(transformed);
+      if (cached.stablecoin) {
+        setStablecoinData(cached.stablecoin);
+        restored = true;
+      }
+      if (cached.dominance) {
+        setDominanceData(cached.dominance);
+        restored = true;
+      }
+      if (cached.price) {
+        setPrice(cached.price);
+        restored = true;
+      }
+      if (cached.summary) {
+        setSummary(cached.summary);
+        restored = true;
+      }
+      if (cached.news) {
+        setNews(cached.news);
+        restored = true;
+      }
+      if (cached.causal) {
+        setCausal(cached.causal);
+        restored = true;
+      }
+      if (cached.premium) {
+        setPremiumData(cached.premium);
+        restored = true;
+      }
+      if (cached.spotDepth) {
+        setSpotDepth(cached.spotDepth);
+        restored = true;
+      }
+      if (cached.proxyStocks) {
+        setProxyStocks(cached.proxyStocks);
+        restored = true;
+      }
+      if (cached.etfAum) {
+        setEtfAum(cached.etfAum);
+        restored = true;
+      }
+
+      if (restored) {
+        setLoading(false);
+        setFromCache(true);
+      }
+    } catch {
+      // Ignore malformed/disabled local cache and continue with network data.
+    }
+  }, []);
+
+  // ── Live spot price — 60 second cadence ──────────────────────────────────
+  const refreshPrice = useCallback(async () => {
+    if (inFlightRef.current.price) return;
+    inFlightRef.current.price = true;
+
+    try {
+      const priceData = await fetchJson<PriceData>("/price");
       setPrice(priceData);
-      setSummary(summaryData);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
-      setMetrics([]);
+      updateDashboardCache({ price: priceData });
+      lastRefreshRef.current.price = Date.now();
+    } catch (err) {
+      console.warn("[price refresh]", err);
     } finally {
+      inFlightRef.current.price = false;
+    }
+  }, []);
+
+  // ── Fast snapshot data — 15 minute cadence ───────────────────────────────
+  const refreshFast = useCallback(async () => {
+    if (inFlightRef.current.fast) return;
+    inFlightRef.current.fast = true;
+
+    try {
+      const [
+        metricsResult,
+        summaryResult,
+        causalResult,
+        premiumResult,
+        depthResult,
+      ] = await Promise.allSettled([
+        fetchJson<Record<string, unknown>>("/metrics"),
+        fetchJson<SummaryData>("/summary"),
+        fetchJson<CausalData>("/causal"),
+        fetchJson<any>("/btc-premium"),
+        fetchJson<SpotDepthData>("/liquidity/depth"),
+      ]);
+
+      const cachePatch: Record<string, unknown> = {};
+
+      if (metricsResult.status === "fulfilled") {
+        const data = metricsResult.value;
+        const transformed = transformMetricsPayload(data);
+
+        setMetrics(transformed);
+
+        if (data["stablecoin_supply"]) {
+          const stablecoin = data["stablecoin_supply"] as StablecoinData;
+          setStablecoinData(stablecoin);
+          cachePatch.stablecoin = stablecoin;
+        }
+
+        if (data["btc_dominance"]) {
+          const dominance = data["btc_dominance"] as DominanceData;
+          setDominanceData(dominance);
+          cachePatch.dominance = dominance;
+        }
+
+        cachePatch.metrics = transformed;
+        setError(null);
+        setFromCache(false);
+      } else {
+        setError(
+          metricsResult.reason instanceof Error
+            ? metricsResult.reason.message
+            : "Metrics refresh failed",
+        );
+      }
+
+      if (summaryResult.status === "fulfilled") {
+        setSummary(summaryResult.value);
+        cachePatch.summary = summaryResult.value;
+      } else {
+        console.warn("[summary refresh]", summaryResult.reason);
+      }
+
+      if (causalResult.status === "fulfilled") {
+        setCausal(causalResult.value);
+        cachePatch.causal = causalResult.value;
+      } else {
+        console.warn("[causal refresh]", causalResult.reason);
+      }
+
+      if (premiumResult.status === "fulfilled") {
+        setPremiumData(premiumResult.value);
+        cachePatch.premium = premiumResult.value;
+      } else {
+        console.warn("[premium refresh]", premiumResult.reason);
+      }
+
+      if (
+        depthResult.status === "fulfilled"
+        && depthResult.value
+        && !(depthResult.value as any).error
+      ) {
+        setSpotDepth(depthResult.value);
+        cachePatch.spotDepth = depthResult.value;
+      } else if (depthResult.status === "rejected") {
+        console.warn("[depth refresh]", depthResult.reason);
+      }
+
+      if (Object.keys(cachePatch).length > 0) {
+        updateDashboardCache(cachePatch);
+      }
+
+      lastRefreshRef.current.fast = Date.now();
+    } finally {
+      inFlightRef.current.fast = false;
       setLoading(false);
     }
   }, []);
- 
-  // ── Flush cache ───────────────────────────────────────────────────────────
-  const flushCache = async () => {
-    setFlushing(true);
-    await Promise.all([
-      fetch(`${API}/cache/flush`),
-      fetch(`${API}/macro/cache/flush`),
-    ]);
-    localStorage.removeItem("btc_metrics_v1");
-    await fetchAll();
-    setFlushing(false);
-  };
- 
-  // ── Poll every 60s ────────────────────────────────────────────────────────
+
+  // ── Market/proxy data — 30 minute cadence ────────────────────────────────
+  const refreshMarket = useCallback(async () => {
+    if (inFlightRef.current.market) return;
+    inFlightRef.current.market = true;
+
+    try {
+      const data = await fetchJson<{
+        crypto_proxies?: Record<string, ProxyStock>;
+      }>("/crypto-proxies");
+
+      if (data.crypto_proxies) {
+        const stocks = Object.values(data.crypto_proxies);
+        setProxyStocks(stocks);
+        updateDashboardCache({ proxyStocks: stocks });
+      }
+
+      lastRefreshRef.current.market = Date.now();
+    } catch (err) {
+      console.warn("[proxy stocks refresh]", err);
+    } finally {
+      inFlightRef.current.market = false;
+    }
+  }, []);
+
+  // ── Hourly snapshot data — news + ETF AUM ────────────────────────────────
+  const refreshHourly = useCallback(async () => {
+    if (inFlightRef.current.hourly) return;
+    inFlightRef.current.hourly = true;
+
+    try {
+      const [newsResult, etfResult] = await Promise.allSettled([
+        fetchJson<{ items?: NewsItem[] }>("/news"),
+        fetchJson<EtfAumData>("/etf-aum/metrics"),
+      ]);
+
+      const cachePatch: Record<string, unknown> = {};
+
+      if (
+        newsResult.status === "fulfilled"
+        && Array.isArray(newsResult.value.items)
+      ) {
+        setNews(newsResult.value.items);
+        cachePatch.news = newsResult.value.items;
+      } else if (newsResult.status === "rejected") {
+        console.warn("[news refresh]", newsResult.reason);
+      }
+
+      if (etfResult.status === "fulfilled") {
+        setEtfAum(etfResult.value);
+        cachePatch.etfAum = etfResult.value;
+      } else {
+        console.warn("[ETF AUM refresh]", etfResult.reason);
+      }
+
+      if (Object.keys(cachePatch).length > 0) {
+        updateDashboardCache(cachePatch);
+      }
+
+      lastRefreshRef.current.hourly = Date.now();
+    } finally {
+      inFlightRef.current.hourly = false;
+    }
+  }, []);
+
+  // ── User-owned data — mount + after writes only ──────────────────────────
+  const refreshUserData = useCallback(async () => {
+    if (inFlightRef.current.user) return;
+    inFlightRef.current.user = true;
+
+    try {
+      const [tradeLogResult, executionResult] = await Promise.allSettled([
+        fetchJson<TradeLog[]>("/trade-log"),
+        fetchJson<any[]>("/trade-execution"),
+      ]);
+
+      if (tradeLogResult.status === "fulfilled") {
+        setLogs(Array.isArray(tradeLogResult.value) ? tradeLogResult.value : []);
+      } else {
+        console.warn("[trade log refresh]", tradeLogResult.reason);
+      }
+
+      if (executionResult.status === "fulfilled") {
+        setExecutions(
+          Array.isArray(executionResult.value) ? executionResult.value : [],
+        );
+      } else {
+        console.warn("[trade execution refresh]", executionResult.reason);
+      }
+    } finally {
+      inFlightRef.current.user = false;
+    }
+  }, []);
+
+  // ── Manual refresh — re-read current snapshots, do not flush collectors ─
+  const refreshNow = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      localStorage.removeItem(METRICS_CACHE_KEY);
+
+      await Promise.all([
+        refreshPrice(),
+        refreshFast(),
+        refreshMarket(),
+        refreshHourly(),
+        refreshUserData(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [
+    refreshFast,
+    refreshHourly,
+    refreshMarket,
+    refreshPrice,
+    refreshUserData,
+  ]);
+
+  // ── Cadence-aware polling, paused while the tab is hidden ────────────────
   useEffect(() => {
-    fetchAll();
-    const id = setInterval(fetchAll, 60000);
-    return () => clearInterval(id);
-  }, [fetchAll]);
- 
+    if (document.visibilityState === "visible") {
+      void refreshPrice();
+      void refreshFast();
+      void refreshMarket();
+      void refreshHourly();
+      void refreshUserData();
+    }
+
+    const runVisible = (fn: () => Promise<void>) => {
+      if (document.visibilityState === "visible") {
+        void fn();
+      }
+    };
+
+    const priceTimer = window.setInterval(
+      () => runVisible(refreshPrice),
+      PRICE_REFRESH_MS,
+    );
+
+    const fastTimer = window.setInterval(
+      () => runVisible(refreshFast),
+      FAST_REFRESH_MS,
+    );
+
+    const marketTimer = window.setInterval(
+      () => runVisible(refreshMarket),
+      MARKET_REFRESH_MS,
+    );
+
+    const hourlyTimer = window.setInterval(
+      () => runVisible(refreshHourly),
+      HOURLY_REFRESH_MS,
+    );
+
+    const refreshStaleGroups = () => {
+      if (document.visibilityState !== "visible") return;
+
+      const now = Date.now();
+
+      if (now - lastRefreshRef.current.price >= PRICE_REFRESH_MS) {
+        void refreshPrice();
+      }
+      if (now - lastRefreshRef.current.fast >= FAST_REFRESH_MS) {
+        void refreshFast();
+      }
+      if (now - lastRefreshRef.current.market >= MARKET_REFRESH_MS) {
+        void refreshMarket();
+      }
+      if (now - lastRefreshRef.current.hourly >= HOURLY_REFRESH_MS) {
+        void refreshHourly();
+      }
+    };
+
+    document.addEventListener("visibilitychange", refreshStaleGroups);
+    window.addEventListener("focus", refreshStaleGroups);
+
+    return () => {
+      window.clearInterval(priceTimer);
+      window.clearInterval(fastTimer);
+      window.clearInterval(marketTimer);
+      window.clearInterval(hourlyTimer);
+      document.removeEventListener("visibilitychange", refreshStaleGroups);
+      window.removeEventListener("focus", refreshStaleGroups);
+    };
+  }, [
+    refreshFast,
+    refreshHourly,
+    refreshMarket,
+    refreshPrice,
+    refreshUserData,
+  ]);
+
   // ── Historical fetch ──────────────────────────────────────────────────────
   // Separate useEffect — was previously nested inside fetchAll causing React error #321
   useEffect(() => {
@@ -1410,12 +1816,17 @@ export default function BTCDecisionDashboard() {
     extreme: metrics.filter(m => m.alertLevel === "extreme").length,
     notable: metrics.filter(m => m.alertLevel === "notable").length,
   }), [metrics]);
+
+  const sortedProxyStocks = useMemo(
+    () => [...proxyStocks].sort((a, b) => b.corr_30d - a.corr_30d),
+    [proxyStocks],
+  );
  
 return (
     <>
       
       <div className="min-h-screen bg-ink text-paper font-sans-body grid-bg">
-        <Header price={price.price} change24h={price.change_24h} onFlushCache={flushCache} flushing={flushing} />
+        <Header price={price.price} change24h={price.change_24h} onRefresh={refreshNow} refreshing={refreshing} />
         <main className="max-w-[1440px] mx-auto px-8 py-8 space-y-10">
 
           {/* Market state bar */}
@@ -1425,7 +1836,7 @@ return (
             <div className="ml-auto flex items-center gap-5">
               <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#C4614A" }} /><span className="caps-sm text-alert-extreme">{summary?.extreme_count ?? alertCounts.extreme} Extreme</span></div>
               <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#C89A3F" }} /><span className="caps-sm text-alert-notable">{summary?.notable_count ?? alertCounts.notable} Notable</span></div>
-              <div className="flex items-center gap-2 pl-5 border-l hairline"><Clock size={11} className="text-faint" /><span className="caps-sm text-faint" suppressHydrationWarning>{now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span></div>
+              <div className="flex items-center gap-2 pl-5 border-l hairline"><Clock size={11} className="text-faint" /><LiveClock /></div>
             </div>
           </div>
 
@@ -1447,7 +1858,7 @@ return (
                   <input type="date" value={selectedDate} max={new Date().toISOString().split("T")[0]} onChange={e => setSelectedDate(e.target.value)} className="bg-surface-inset border hairline px-2.5 py-1.5 text-paper font-mono-data text-[11px] focus:border-amber-sand focus:outline-none cursor-pointer" style={{ colorScheme: "dark" }} />
                   {selectedDate && <button onClick={() => setSelectedDate("")} className="caps-sm text-faint hover:text-alert-extreme transition-colors px-2 py-1.5 border hairline">✕ Live</button>}
                 </div>
-                <span className="caps-sm text-faint">{selectedDate ? "Historical snapshot": loading ? "Fetching fresh data…" :fromCache ? "Cached · refreshing…" :"Benchmark · alert · pattern · no judgment"}</span>
+                <span className="caps-sm text-faint">{selectedDate ? "Historical snapshot": loading ? "Fetching fresh data…" :fromCache ? "Cached · refreshing…" : "Benchmark · alert · pattern · no judgment"}</span>
               </div>
             </div>
 
@@ -1567,9 +1978,9 @@ return (
             <section>
               <SectionLabel numeral="XIIi" title="Crypto Proxy Stocks" subtitle="S&P 500 crypto-exposed · BTC correlation · lead/lag · yFinance" />
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-3">
-                {proxyStocks.sort((a, b) => b.corr_30d - a.corr_30d).map(s => <ProxyStockCard key={s.ticker} stock={s} />)}
+                {sortedProxyStocks.map(s => <ProxyStockCard key={s.ticker} stock={s} />)}
               </div>
-              <CorrelationMatrix stocks={proxyStocks} />
+              <CorrelationMatrix stocks={sortedProxyStocks} />
             </section>
           )}
 
@@ -1592,13 +2003,13 @@ return (
           {/* Trade execution */}
           <section>
             <SectionLabel numeral="VI" title="Trade execution" subtitle="Quantitative log · slippage · volume benchmarks · SEM feed" />
-            <TradeExecutionPanel executions={executions} onAdd={() => { fetch(`${API}/trade-execution`).then(r => r.json()).then(data => { if (Array.isArray(data)) setExecutions(data); }); }} />
+            <TradeExecutionPanel executions={executions} onAdd={() => { void refreshUserData(); }} />
           </section>
 
           {/* Trade log */}
           <section>
             <SectionLabel numeral="VII" title="Trade Log, Review & notes" subtitle="Trade log · post-trade SEM review" />
-            <TradeLogReview logs={logs} onAdd={() => { fetch(`${API}/trade-log`).then(r => r.json()).then(data => { if (Array.isArray(data)) setLogs(data); }); }} />
+            <TradeLogReview logs={logs} onAdd={() => { void refreshUserData(); }} />
           </section>
 
           <footer className="pt-8 hairline-t flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-muted">
