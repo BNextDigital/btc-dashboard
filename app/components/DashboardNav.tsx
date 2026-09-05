@@ -38,6 +38,7 @@ export const NAV_ITEMS = [
   { key: "btc",          href: "/",             label: "BTC"          },
   { key: "eth",          href: "/eth",           label: "ETH"          },
   { key: "sol",          href: "/sol",           label: "SOL"          },
+  { key: "powder-keg",   href: "/powder-keg",    label: "Powder Keg"   },
   { key: "macro",        href: "/macro",         label: "Macro"        },
   { key: "liquidity",    href: "/liquidity",     label: "Liquidity"    },
   { key: "forex",        href: "/forex",         label: "Forex"        },
