@@ -29,8 +29,6 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Activity, AlertTriangle, TrendingDown, Minus } from "lucide-react";
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type AlertLevel = "extreme" | "notable" | "neutral" | "none";
@@ -60,15 +58,19 @@ export interface SpotDepthData {
   depth_haircut_pct:      string;
   haircut_reason:         "stressed" | "normal";
 
-  depth_coverage_ratio:   number;
-  adjusted_coverage:      number;
+  depth_coverage_ratio:   number | null;
+  adjusted_coverage:      number | null;
 
   liquidation_estimate_usd: string;
   liquidation_source:       string;
   oi_usd:                   string;
+  oi_age_seconds?:           number | null;
+  leverage_context_source?:  string;
 
   slippage_estimate:       string;
   depth_vs_median_pct:     number | null;
+  depth_history_days?:     number;
+  depth_history_samples?:  number;
   venue_concentration_pct: number;
   venues_online:           string[];
 
@@ -92,14 +94,16 @@ const ALERT_STYLES: Record<AlertLevel, { text: string; bg: string; border: strin
   none:    { text: "text-slate-400", bg: "bg-slate-900",    border: "border-slate-800" },
 };
 
-function coverageHex(ratio: number): string {
-  if (ratio >= 1.5)  return "#8DA078";  // sage
-  if (ratio >= 1.0)  return "#D9A84D";  // amber
-  if (ratio >= 0.75) return "#f97316";  // orange
-  return "#f87171";                      // red
+function coverageHex(ratio: number | null): string {
+  if (ratio == null) return "#6B7280";   // unavailable / muted
+  if (ratio >= 1.5)  return "#8DA078";   // sage
+  if (ratio >= 1.0)  return "#D9A84D";   // amber
+  if (ratio >= 0.75) return "#f97316";   // orange
+  return "#f87171";                       // red
 }
 
-function coverageLabel(ratio: number): string {
+function coverageLabel(ratio: number | null): string {
+  if (ratio == null) return "Unavailable";
   if (ratio >= 1.5)  return "Deep";
   if (ratio >= 1.0)  return "Adequate";
   if (ratio >= 0.75) return "Thin";
@@ -108,10 +112,17 @@ function coverageLabel(ratio: number): string {
 }
 
 function slippageHex(s: string): string {
+  if (!s || s === "—")  return "#6B7280";
   if (s === "< 0.5%")   return "#8DA078";
   if (s === "0.5–1.0%") return "#D9A84D";
   if (s === "1.0–2.0%") return "#f97316";
   return "#f87171";
+}
+
+function historyLabel(days: number): string {
+  if (days >= 29.5) return "vs 30d median";
+  if (days >= 1) return `vs ${Math.max(1, Math.floor(days))}d median`;
+  return "Depth history";
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -203,10 +214,14 @@ export default function SpotDepthCard({ data }: { data: SpotDepthData }) {
   const raw05M    = parseMillion(data.bid_depth_0_5pct_usd);
   const raw10M    = parseMillion(data.bid_depth_1_0pct_usd);
 
-  const DirIcon =
-    data.current_dir === "down" ? AlertTriangle :
-    data.current_dir === "up"   ? TrendingDown  :
-    Minus;
+  const historyDays = data.depth_history_days ?? 0;
+  const historySamples = data.depth_history_samples ?? 0;
+  const medianLabel = historyLabel(historyDays);
+
+  const liquidationMode =
+    data.liquidation_source === "CoinGlass heatmap" ? "live" :
+    data.liquidation_source === "OI estimate (heuristic)" ? "OI heuristic" :
+    "unavailable";
 
   const medianColor =
     data.depth_vs_median_pct == null   ? "text-slate-600"  :
@@ -251,7 +266,7 @@ export default function SpotDepthCard({ data }: { data: SpotDepthData }) {
         <div className="text-right shrink-0">
           <div className="caps-sm text-faint mb-1">Visible</div>
           <div className="font-mono text-slate-400" style={{ fontSize: 14 }}>
-            {data.depth_coverage_ratio.toFixed(2)}x
+            {data.depth_coverage_ratio != null ? `${data.depth_coverage_ratio.toFixed(2)}x` : "—"}
           </div>
           <div className="font-mono text-slate-600" style={{ fontSize: 10 }}>
             {data.depth_haircut_pct} haircut · {data.haircut_reason}
@@ -279,11 +294,13 @@ export default function SpotDepthCard({ data }: { data: SpotDepthData }) {
           </div>
         </div>
         <div>
-          <div className="caps-sm text-faint mb-1">vs 30d median</div>
+          <div className="caps-sm text-faint mb-1">{medianLabel}</div>
           <div className={`font-mono text-[12px] ${medianColor}`}>
             {data.depth_vs_median_pct != null
               ? `${data.depth_vs_median_pct}%`
-              : "building…"}
+              : historySamples > 0
+                ? `building · ${historySamples}`
+                : "building…"}
           </div>
         </div>
         <div>
@@ -330,7 +347,7 @@ export default function SpotDepthCard({ data }: { data: SpotDepthData }) {
             className="font-mono px-1.5 py-0.5 border border-slate-800 bg-slate-900 text-slate-500"
             style={{ fontSize: 10 }}
           >
-            Liq · {data.liquidation_source === "CoinGlass heatmap" ? "live" : "heuristic"}
+            Liq · {liquidationMode}
           </span>
         </div>
       </div>
@@ -349,14 +366,22 @@ export default function SpotDepthCard({ data }: { data: SpotDepthData }) {
         </span>
       </div>
 
-      {/* ── Live indicator (mirrors pulse-dot pattern) ── */}
+      {/* ── Snapshot freshness ── */}
       <div className="flex items-center gap-1 text-faint">
         <span
-          className="inline-block rounded-full pulse-dot"
+          className="inline-block rounded-full"
           style={{ width: 5, height: 5, background: "#8DA078", flexShrink: 0 }}
         />
         <span className="caps-sm">
-          {data.venues_online.join(" · ")} · {data.updated_at ? new Date(data.updated_at).toLocaleTimeString() : "—"}
+          Snapshot · {data.venues_online.join(" · ")} ·{" "}
+          {data.updated_at
+            ? new Date(data.updated_at).toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "America/New_York",
+                timeZoneName: "short",
+              })
+            : "—"}
         </span>
       </div>
     </div>
