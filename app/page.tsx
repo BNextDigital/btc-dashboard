@@ -39,10 +39,8 @@ type Metric = {
   spread_label?: string;
   high_exchange?: string;
   low_exchange?: string;
-  // add to Metric type
   source?: string;
   last_date?: string;
-  d30?: string;
 };
 
 type StablecoinData = {
@@ -167,7 +165,6 @@ function transformMetricsPayload(data: Record<string, unknown>): Metric[] {
         currentDir: m.current_dir as "up" | "down" | "flat",
         d7: m.d7 as string,
         vs30d: m.vs30d as string,
-        d30: (m.d30 as string) ?? undefined,
         percentile: m.percentile as number,
         alert: m.alert as string,
         alertLevel: m.alert_level as
@@ -323,12 +320,20 @@ const MetricCard = ({ metric, index }: { metric: Metric; index: number }) => {
         <Sparkline data={metric.spark} dir={metric.currentDir} />
       </div>
 
-      <div className="grid grid-cols-4 gap-2 hairline-t pt-3">
-  <div><div className="caps-sm text-faint mb-1">7d</div><div className="font-mono-data text-paper-2 text-[12px]">{metric.d7}</div></div>
-  <div><div className="caps-sm text-faint mb-1">30d</div><div className="font-mono-data text-paper-2 text-[12px]">{metric.d30 ?? "—"}</div></div>
-  <div><div className="caps-sm text-faint mb-1">vs 30d</div><div className="font-mono-data text-paper-2 text-[12px]">{metric.vs30d}</div></div>
-  <div><div className="caps-sm text-faint mb-1">Pctl</div><div className="font-mono-data text-paper-2 text-[12px]">{metric.percentile}</div></div>
-</div>
+      <div className="grid grid-cols-3 gap-2 hairline-t pt-3">
+        <div>
+          <div className="caps-sm text-faint mb-1">7d</div>
+          <div className="font-mono-data text-paper-2 text-[12px]">{metric.d7}</div>
+        </div>
+        <div>
+          <div className="caps-sm text-faint mb-1">vs 30d</div>
+          <div className="font-mono-data text-paper-2 text-[12px]">{metric.vs30d}</div>
+        </div>
+        <div>
+          <div className="caps-sm text-faint mb-1">Pctl</div>
+          <div className="font-mono-data text-paper-2 text-[12px]">{metric.percentile}</div>
+        </div>
+      </div>
 
       <div>
         <PercentileBar value={metric.percentile} />
