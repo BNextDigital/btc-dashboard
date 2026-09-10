@@ -155,7 +155,13 @@ function updateDashboardCache(patch: Record<string, unknown>) {
 
 function transformMetricsPayload(data: Record<string, unknown>): Metric[] {
   return Object.entries(data)
-    .filter(([id]) => id !== "stablecoin_supply" && id !== "btc_dominance")
+    .filter(
+      ([id]) =>
+        id !== "stablecoin_supply"
+        && id !== "btc_dominance"
+        && id !== "funding"
+        && id !== "open_interest"
+    )
     .map(([id, raw]) => {
       const m = raw as Record<string, unknown>;
 
@@ -1185,7 +1191,7 @@ function PremiumCard({ data }: { data: any }) {
   const barRight  = clampedBps >= 0  // true = onshore premium (extends right from centre)
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+     <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div>
@@ -1374,6 +1380,7 @@ export default function BTCDecisionDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [etfAum, setEtfAum]       = useState<EtfAumData | null>(null);
   const [spotDepth, setSpotDepth] = useState<SpotDepthData | null>(null);
+  const [perpsPressure, setPerpsPressure] = useState<PerpsPressureData | null>(null);
   const inFlightRef = useRef({
     price: false,
     fast: false,
@@ -1444,6 +1451,10 @@ export default function BTCDecisionDashboard() {
         setSpotDepth(cached.spotDepth);
         restored = true;
       }
+       if (cached.perpsPressure) {
+        setPerpsPressure(cached.perpsPressure);
+        restored = true;
+      }
       if (cached.proxyStocks) {
         setProxyStocks(cached.proxyStocks);
         restored = true;
@@ -1491,12 +1502,14 @@ export default function BTCDecisionDashboard() {
         causalResult,
         premiumResult,
         depthResult,
+        perpsResult,
       ] = await Promise.allSettled([
         fetchJson<Record<string, unknown>>("/metrics"),
         fetchJson<SummaryData>("/summary"),
         fetchJson<CausalData>("/causal"),
         fetchJson<any>("/btc-premium"),
         fetchJson<SpotDepthData>("/liquidity/depth"),
+        fetchJson<PerpsPressureData>("/derivatives/pressure"),
       ]);
 
       const cachePatch: Record<string, unknown> = {};
@@ -1560,6 +1573,15 @@ export default function BTCDecisionDashboard() {
         cachePatch.spotDepth = depthResult.value;
       } else if (depthResult.status === "rejected") {
         console.warn("[depth refresh]", depthResult.reason);
+      }
+      if (
+        perpsResult.status === "fulfilled"
+        && perpsResult.value
+      ) {
+        setPerpsPressure(perpsResult.value);
+        cachePatch.perpsPressure = perpsResult.value;
+      } else if (perpsResult.status === "rejected") {
+        console.warn("[perps pressure refresh]", perpsResult.reason);
       }
 
       if (Object.keys(cachePatch).length > 0) {
@@ -1849,8 +1871,26 @@ return (
 
           {/* Spot chart */}
           <section><TradingViewEmbed /></section>
-          <SectionLabel numeral="0" title="Spot Depth for Liquidity Cascade Risk" />
-          {spotDepth && <SpotDepthCard data={spotDepth} />}
+
+          {!selectedDate && perpsPressure && (
+            <section>
+              <SectionLabel
+                numeral="0"
+                title="Perps Pressure"
+                subtitle="Carry · crowding · forced flow · squeeze vulnerability"
+              />
+              <PerpsPressureCard data={perpsPressure} />
+            </section>
+          )}
+
+          <section>
+            <SectionLabel
+              numeral="0A"
+              title="Spot Depth for Liquidity Cascade Risk"
+              subtitle="If leverage gets forced, can spot absorb it?"
+            />
+            {spotDepth && <SpotDepthCard data={spotDepth} />}
+          </section>
 
           {/* Section I — Market state snapshot */}
           <section>
