@@ -4,14 +4,13 @@
  * app/macro/page.tsx — Day 2 Macro Dashboard
  *
  * Hierarchy:
- *   0. Macro trigger / data mode
+ *   0. Macro Check Engine / transmission chain
+ *      Macro trigger / data mode
  *   I. Expectations & repricing
  *  II. Financial conditions
  * III. Cross-asset confirmation
- *  IV. Regime diagnosis
- *   V. Transmission chain
- *  VI. Treasury curve context
- * VII. Secondary cross-asset context
+ *  IV. Treasury curve context
+ *   V. Secondary cross-asset context
  *
  * Data: GET /macro/metrics
  * The existing root payload remains supported; the new Day 2 layer lives
@@ -70,11 +69,21 @@ interface FedWatchData {
   as_of?: string | null;
   next_meeting?: string | null;
   current_target?: string | null;
+
   cut_probability?: number | null;
   hold_probability?: number | null;
   hike_probability?: number | null;
+
   cut_probability_change_1d_pp?: number | null;
+  hold_probability_change_1d_pp?: number | null;
+  hike_probability_change_1d_pp?: number | null;
+
+  dominant_outcome?: "cut" | "hold" | "hike" | string;
+  dominant_probability?: number | null;
+  dominant_probability_change_1d_pp?: number | null;
+
   expected_change_bp?: number | null;
+  expected_change_bp_change_1d?: number | null;
   current_effr?: number | null;
   monthly_implied_effr?: number | null;
   post_meeting_expected_effr?: number | null;
@@ -104,6 +113,22 @@ interface Day2MarketMetric {
   source?: string;
   as_of?: string;
   error?: string;
+  signal?: string;
+  yield_direction?: "up" | "down" | "flat" | string | null;
+  note?: string;
+}
+
+interface DataAlignment {
+  status?: "aligned" | "mixed_freshness" | "stale_confirmation" | "unknown" | string;
+  market_as_of?: string | null;
+  treasury_as_of?: string | null;
+  inflation_as_of?: string | null;
+  credit_as_of?: string | null;
+  lagging_groups?: string[];
+  lag_sessions?: Record<string, number>;
+  max_lag_sessions?: number | null;
+  confidence_multiplier?: number | null;
+  note?: string;
 }
 
 interface PolicyRead {
@@ -135,9 +160,11 @@ interface Day2Layer {
   trigger?: MacroTrigger | null;
   fedwatch?: FedWatchData;
   rates?: Record<string, Day2RateMetric>;
+  policy_sensor?: Day2MarketMetric;
   policy_read?: PolicyRead;
   conditions?: Record<string, Day2MarketMetric>;
   cross_asset?: Record<string, Day2MarketMetric>;
+  data_alignment?: DataAlignment;
   regime?: RegimeData;
   transmission?: TransmissionStep[];
   data_mode?: "event_relative" | "daily_repricing" | "unavailable" | string;
@@ -333,7 +360,19 @@ function FedWatchCard({ data }: { data?: FedWatchData }) {
     );
   }
 
-  const delta = data.cut_probability_change_1d_pp;
+  const candidates = [
+    { key: "cut", value: data.cut_probability ?? 0, delta: data.cut_probability_change_1d_pp },
+    { key: "hold", value: data.hold_probability ?? 0, delta: data.hold_probability_change_1d_pp },
+    { key: "hike", value: data.hike_probability ?? 0, delta: data.hike_probability_change_1d_pp },
+  ];
+  const fallbackDominant = candidates.reduce((best, item) => item.value > best.value ? item : best, candidates[0]);
+  const dominant = (data.dominant_outcome ?? fallbackDominant.key).toLowerCase();
+  const dominantProbability = data.dominant_probability ?? candidates.find((item) => item.key === dominant)?.value ?? 0;
+  const dominantDelta = data.dominant_probability_change_1d_pp
+    ?? candidates.find((item) => item.key === dominant)?.delta
+    ?? null;
+
+  const dominantColor = dominant === "hike" ? COLORS.red : dominant === "cut" ? COLORS.green : COLORS.gold;
   const statusText = isOfficial ? "Official" : "Derived";
   const statusColor = isOfficial ? COLORS.green : COLORS.gold;
 
@@ -348,21 +387,39 @@ function FedWatchCard({ data }: { data?: FedWatchData }) {
       </div>
 
       <div className="mt-4">
-        <div className="text-[10px] font-mono text-slate-600 uppercase tracking-wide">Cut probability</div>
-        <div className="font-mono text-4xl text-slate-100 mt-1">{fmt(data.cut_probability, 1, "%")}</div>
-        <div className={`font-mono text-xs mt-1 ${moveColor(delta, false)}`}>Δ 1d {signed(delta, 1, "pp")}</div>
+        <div className="text-[10px] font-mono text-slate-600 uppercase tracking-wide">
+          {dominant} probability
+        </div>
+        <div className="font-mono text-4xl mt-1" style={{ color: dominantColor }}>
+          {fmt(dominantProbability, 1, "%")}
+        </div>
+        <div className="font-mono text-xs mt-1" style={{ color: dominantDelta == null ? COLORS.muted : dominantColor }}>
+          Δ 1d {signed(dominantDelta, 1, "pp")}
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3 border-t border-slate-900 mt-4 pt-3">
-        <div><div className="text-[9px] font-mono text-slate-600">CUT</div><div className="font-mono text-sm">{fmt(data.cut_probability, 1, "%")}</div></div>
-        <div><div className="text-[9px] font-mono text-slate-600">HOLD</div><div className="font-mono text-sm">{fmt(data.hold_probability, 1, "%")}</div></div>
-        <div><div className="text-[9px] font-mono text-slate-600">HIKE</div><div className="font-mono text-sm">{fmt(data.hike_probability, 1, "%")}</div></div>
+        {candidates.map((item) => {
+          const color = item.key === "hike" ? COLORS.red : item.key === "cut" ? COLORS.green : COLORS.gold;
+          return (
+            <div key={item.key}>
+              <div className="text-[9px] font-mono text-slate-600 uppercase">{item.key}</div>
+              <div className="font-mono text-sm">{fmt(item.value, 1, "%")}</div>
+              <div className="font-mono text-[9px] mt-0.5" style={{ color: item.delta == null ? COLORS.muted : color }}>
+                {signed(item.delta, 1, "pp")}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-2 gap-3 border-t border-slate-900 mt-4 pt-3">
         <div>
           <div className="text-[9px] font-mono text-slate-600 uppercase">Expected meeting move</div>
           <div className="font-mono text-sm text-slate-300 mt-1">{signed(data.expected_change_bp, 1, "bp")}</div>
+          <div className="font-mono text-[9px] text-slate-600 mt-0.5">
+            Δ 1d {signed(data.expected_change_bp_change_1d, 1, "bp")}
+          </div>
         </div>
         <div>
           <div className="text-[9px] font-mono text-slate-600 uppercase">Current EFFR</div>
@@ -385,7 +442,7 @@ function FedWatchCard({ data }: { data?: FedWatchData }) {
 function RateCard({ data, emphasis = false }: { data?: Day2RateMetric; emphasis?: boolean }) {
   if (!data || data.current == null) return <BlankCard title={data?.label ?? "Rate"} message={data?.error ?? "No data"} />;
   return (
-    <div className={`rounded-xl border bg-slate-950 p-5 ${emphasis ? "border-gold-900/50" : "border-slate-800"}`}>
+    <div className={`rounded-xl border bg-slate-950 p-5 ${emphasis ? "border-amber-900/50" : "border-slate-800"}`}>
       <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">{data.label}</div>
       <div className="font-mono text-3xl text-slate-100 mt-2">{fmt(data.current, 2, "%")}</div>
       <div className="grid grid-cols-2 gap-3 mt-4 border-t border-slate-900 pt-3">
@@ -403,6 +460,47 @@ function RateCard({ data, emphasis = false }: { data?: Day2RateMetric; emphasis?
         <PercentileBar value={data.percentile} />
       </div>
       <div className="text-[9px] font-mono text-slate-700 mt-3">{data.source} · {data.as_of ?? "—"}</div>
+    </div>
+  );
+}
+
+function PolicySensorCard({ data }: { data?: Day2MarketMetric }) {
+  if (!data || data.current == null) {
+    return <BlankCard title="2Y T-Note Futures" message={data?.error ?? "No same-session 2Y futures data"} />;
+  }
+
+  const color = regimeColor(data.signal);
+  const yieldArrow = data.yield_direction === "up" ? "↑"
+    : data.yield_direction === "down" ? "↓"
+    : "→";
+
+  return (
+    <div className="rounded-xl border bg-slate-950 p-5" style={{ borderColor: color + "55" }}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">2Y T-Note Futures</div>
+          <div className="text-[9px] font-mono text-slate-700 mt-1">Same-session policy sensor</div>
+        </div>
+        <StatusPill text={data.signal ?? "neutral"} color={color} />
+      </div>
+
+      <div className="font-mono text-3xl text-slate-100 mt-3">{fmt(data.current, 3)}</div>
+
+      <div className="grid grid-cols-2 gap-3 mt-4 border-t border-slate-900 pt-3">
+        <div>
+          <div className="text-[9px] font-mono text-slate-600 uppercase">1d price</div>
+          <div className={`font-mono text-sm ${moveColor(data.d1_pct, false)}`}>
+            {signed(data.d1_pct, 2, "%")}
+          </div>
+        </div>
+        <div>
+          <div className="text-[9px] font-mono text-slate-600 uppercase">Yield direction</div>
+          <div className="font-mono text-sm" style={{ color }}>{yieldArrow}</div>
+        </div>
+      </div>
+
+      <div className="text-[9px] text-slate-700 mt-3">Price ↑ = yield ↓ · Price ↓ = yield ↑</div>
+      <div className="text-[9px] font-mono text-slate-700 mt-1">{data.source} · {data.as_of ?? "—"}</div>
     </div>
   );
 }
@@ -450,32 +548,84 @@ function ReactionCard({ data, unit = "number", positiveIsBad = false }: {
 
 // ─── IV. Regime ──────────────────────────────────────────────────────────────
 
-function RegimeCard({ data }: { data?: RegimeData }) {
-  if (!data) return <BlankCard title="Macro Regime" message="No regime analysis" />;
-  const color = regimeColor(data.level);
+function MacroCheckEngine({ day2 }: { day2: Day2Layer }) {
+  const regime = day2.regime;
+  const alignment = day2.data_alignment;
+  const color = regimeColor(regime?.level);
+
+  const alignmentColor =
+    alignment?.status === "aligned" ? COLORS.green
+      : alignment?.status === "stale_confirmation" ? COLORS.red
+      : COLORS.gold;
+
   return (
-    <div className="rounded-xl border p-6" style={{ borderColor: color + "66", backgroundColor: color + "0A" }}>
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+    <div className="rounded-xl border p-5" style={{ borderColor: color + "66", backgroundColor: color + "08" }}>
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
-          <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">Macro Regime</div>
-          <div className="text-3xl mt-1" style={{ color, fontFamily: "'Instrument Serif', Georgia, serif" }}>{data.label ?? "—"}</div>
+          <div className="text-[10px] font-mono text-slate-500 uppercase tracking-[0.18em]">
+            Macro Check Engine
+          </div>
+          <div className="text-3xl mt-1" style={{ color, fontFamily: "'Instrument Serif', Georgia, serif" }}>
+            {regime?.label ?? "Macro state unavailable"}
+          </div>
+          <p className="text-sm text-slate-300 leading-relaxed mt-2 max-w-4xl">
+            {regime?.explanation ?? "No regime analysis available."}
+          </p>
         </div>
-        <div className="text-right">
-          <div className="text-[9px] font-mono text-slate-600 uppercase">Confidence</div>
-          <div className="font-mono text-2xl" style={{ color }}>{data.confidence ?? 0}%</div>
+
+        <div className="flex items-start gap-4">
+          <div className="text-right">
+            <div className="text-[9px] font-mono text-slate-600 uppercase">Confidence</div>
+            <div className="font-mono text-2xl" style={{ color }}>{regime?.confidence ?? 0}%</div>
+          </div>
+          <StatusPill
+            text={(alignment?.status ?? "alignment unknown").replaceAll("_", " ")}
+            color={alignmentColor}
+          />
         </div>
       </div>
-      <p className="text-sm text-slate-300 leading-relaxed mt-4 max-w-4xl">{data.explanation ?? "—"}</p>
-      {!!data.evidence?.length && (
-        <div className="flex flex-wrap gap-2 mt-4 border-t border-slate-900 pt-4">
-          {data.evidence.map((item) => <StatusPill key={item} text={item} color={color} />)}
+
+      {alignment && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 border-t border-slate-900 pt-4">
+          <div>
+            <div className="text-[9px] font-mono text-slate-600 uppercase">Market</div>
+            <div className="font-mono text-[11px] text-slate-400 mt-1">{alignment.market_as_of ?? "—"}</div>
+          </div>
+          <div>
+            <div className="text-[9px] font-mono text-slate-600 uppercase">Treasury / real</div>
+            <div className="font-mono text-[11px] text-slate-400 mt-1">{alignment.treasury_as_of ?? "—"}</div>
+          </div>
+          <div>
+            <div className="text-[9px] font-mono text-slate-600 uppercase">Inflation</div>
+            <div className="font-mono text-[11px] text-slate-400 mt-1">{alignment.inflation_as_of ?? "—"}</div>
+          </div>
+          <div>
+            <div className="text-[9px] font-mono text-slate-600 uppercase">Credit</div>
+            <div className="font-mono text-[11px] text-slate-400 mt-1">{alignment.credit_as_of ?? "—"}</div>
+          </div>
         </div>
       )}
+
+      {alignment?.note && (
+        <div className="text-[10px] font-mono mt-3" style={{ color: alignmentColor }}>
+          {alignment.note}
+        </div>
+      )}
+
+      {!!regime?.evidence?.length && (
+        <div className="flex flex-wrap gap-2 mt-4">
+          {regime.evidence.map((item) => <StatusPill key={item} text={item} color={color} />)}
+        </div>
+      )}
+
+      <div className="mt-5">
+        <TransmissionChain steps={day2.transmission} />
+      </div>
     </div>
   );
 }
 
-// ─── V. Transmission ────────────────────────────────────────────────────────
+// ─── 0. Macro Check Engine transmission ─────────────────────────────────────
 
 function TransmissionChain({ steps }: { steps?: TransmissionStep[] }) {
   if (!steps?.length) return <BlankCard title="Transmission Chain" message="No transmission analysis" />;
@@ -635,9 +785,20 @@ export default function MacroDashboard() {
         )}
 
         {macro && !day2 && (
-          <div className="rounded-xl border border-gold-900/40 bg-gold-950/10 p-4 text-sm text-gold-300">
+          <div className="rounded-xl border border-amber-900/40 bg-amber-950/10 p-4 text-sm text-amber-300">
             Day 2 backend layer is not deployed yet. Legacy Treasury context remains available below.
           </div>
+        )}
+
+        {day2 && (
+          <section>
+            <SectionLabel
+              num="0"
+              title="Transmission Chain"
+              subtitle="Macro Check Engine · observed first · inference second"
+            />
+            <MacroCheckEngine day2={day2} />
+          </section>
         )}
 
         {day2 && <MacroTriggerPanel day2={day2} />}
@@ -647,7 +808,8 @@ export default function MacroDashboard() {
             <SectionLabel num="I" title="Expectations & Repricing" subtitle="What did the market price differently?" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <FedWatchCard data={day2.fedwatch} />
-              <RateCard data={rates.yield_2y} emphasis />
+              <PolicySensorCard data={day2.policy_sensor} />
+              <RateCard data={rates.yield_2y} />
               <RateCard data={rates.real_yield_10y} emphasis />
               <RateCard data={rates.breakeven_10y} />
               <RateCard data={rates.yield_10y} />
@@ -681,30 +843,16 @@ export default function MacroDashboard() {
           </section>
         )}
 
-        {day2 && (
-          <section>
-            <SectionLabel num="IV" title="Regime Diagnosis" subtitle="Good dovish, bad dovish, hawkish, or mixed?" />
-            <RegimeCard data={day2.regime} />
-          </section>
-        )}
-
-        {day2 && (
-          <section>
-            <SectionLabel num="V" title="Transmission Chain" subtitle="Observed first · inference second" />
-            <TransmissionChain steps={day2.transmission} />
-          </section>
-        )}
-
         {macro && (
           <section>
-            <SectionLabel num="VI" title="Treasury Curve Context" subtitle="Structure, not the trigger by itself" />
+            <SectionLabel num="IV" title="Treasury Curve Context" subtitle="Structure, not the trigger by itself" />
             <YieldTable yields={macro.yields} curve={macro.curve} />
           </section>
         )}
 
         {macro && (macro.gold || macro.silver || macro.platinum || macro.copper) && (
           <section>
-            <SectionLabel num="VII" title="Secondary Cross-Asset Context" subtitle="Useful context · lower priority" />
+            <SectionLabel num="V" title="Secondary Cross-Asset Context" subtitle="Useful context · lower priority" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <SMACard title="Gold" data={macro.gold} />
               <SMACard title="Silver" data={macro.silver} />
