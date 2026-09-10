@@ -16,6 +16,8 @@ import TradingViewEmbed from "./components/TradingViewEmbed";
 import { NavLinks } from "./components/DashboardNav";
 import SpotDepthCard from "./components/SpotDepthCard";
 import type { SpotDepthData } from "./components/SpotDepthCard";
+import PerpsPressureCard from "./components/PerpsPressureCard";
+import type { PerpsPressureData } from "./components/PerpsPressureCard";
 
 
 const API = process.env.NEXT_PUBLIC_API_URL;
