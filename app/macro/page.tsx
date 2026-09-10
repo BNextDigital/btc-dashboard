@@ -335,7 +335,7 @@ function FedWatchCard({ data }: { data?: FedWatchData }) {
 
   const delta = data.cut_probability_change_1d_pp;
   const statusText = isOfficial ? "Official" : "Derived";
-  const statusColor = isOfficial ? COLORS.green : COLORS.amber;
+  const statusColor = isOfficial ? COLORS.green : COLORS.gold;
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
@@ -385,7 +385,7 @@ function FedWatchCard({ data }: { data?: FedWatchData }) {
 function RateCard({ data, emphasis = false }: { data?: Day2RateMetric; emphasis?: boolean }) {
   if (!data || data.current == null) return <BlankCard title={data?.label ?? "Rate"} message={data?.error ?? "No data"} />;
   return (
-    <div className={`rounded-xl border bg-slate-950 p-5 ${emphasis ? "border-amber-900/50" : "border-slate-800"}`}>
+    <div className={`rounded-xl border bg-slate-950 p-5 ${emphasis ? "border-gold-900/50" : "border-slate-800"}`}>
       <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">{data.label}</div>
       <div className="font-mono text-3xl text-slate-100 mt-2">{fmt(data.current, 2, "%")}</div>
       <div className="grid grid-cols-2 gap-3 mt-4 border-t border-slate-900 pt-3">
@@ -635,7 +635,7 @@ export default function MacroDashboard() {
         )}
 
         {macro && !day2 && (
-          <div className="rounded-xl border border-amber-900/40 bg-amber-950/10 p-4 text-sm text-amber-300">
+          <div className="rounded-xl border border-gold-900/40 bg-gold-950/10 p-4 text-sm text-gold-300">
             Day 2 backend layer is not deployed yet. Legacy Treasury context remains available below.
           </div>
         )}
