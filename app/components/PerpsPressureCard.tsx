@@ -1,82 +1,9 @@
 "use client";
 
-export type PressureCell = {
-  score?: number | null;
-  level?: "high" | "elevated" | "moderate" | "low" | "unavailable" | string;
-};
-
-export type PerpsPressureData = {
-  name?: string;
-  category?: string;
-  updated_at?: string;
-  state?: {
-    code?: string;
-    label?: string;
-    primary_side?: "longs" | "shorts" | "mixed" | string;
-    severity?: string;
-    explanation?: string;
-  };
-  matrix?: {
-    longs?: Record<string, PressureCell>;
-    shorts?: Record<string, PressureCell>;
-  };
-  carry?: {
-    payer?: string;
-    funding_pct_8h?: number | null;
-    annualized_pct_if_persisted?: number | null;
-    cumulative_7d_pct?: number | null;
-    cumulative_30d_pct?: number | null;
-    history_days_available?: number;
-    hypothetical_notional_usd?: number | null;
-    cost_per_day_if_rate_persisted_usd?: number | null;
-    cost_per_week_if_rate_persisted_usd?: number | null;
-    exchange_rates_pct_8h?: Record<string, number>;
-    persistence_24h?: {
-      coverage_hours?: number | null;
-      sample_count?: number;
-      positive_share_pct?: number | null;
-      negative_share_pct?: number | null;
-      dominant_side?: string;
-    };
-    note?: string;
-  };
-  positioning?: {
-    oi_display?: string;
-    oi_change_24h_pct?: number | null;
-    oi_change_7d_pct?: number | null;
-    price_usd?: number | null;
-    price_change_1d_pct?: number | null;
-    price_change_7d_pct?: number | null;
-  };
-  forced_flow?: {
-    side?: string;
-    state?: string;
-    label?: string;
-    confidence?: string;
-    explanation?: string;
-  };
-  liquidation_vulnerability?: {
-    status?: string;
-    source?: string | null;
-    long_cluster_display?: string;
-    short_cluster_display?: string;
-    note?: string;
-  };
-  basis_context?: {
-    status?: string;
-    annualized?: number | string | null;
-    trend_5d?: string | null;
-    pattern?: string | null;
-    alert?: string | null;
-  };
-  data_quality?: {
-    status?: string;
-    core_inputs_available?: number;
-    funding_sample_count_24h?: number;
-    funding_history_coverage_hours?: number;
-    liquidation_clusters?: string;
-  };
-};
+import type {
+  PerpsPressureData,
+  PressureCell,
+} from "@/app/types/btc-dashboard";
 
 const COLORS = {
   paper: "#E8E6E0",
