@@ -1,89 +1,11 @@
 "use client";
 
-/**
- * app/components/SpotDepthCard.tsx — Spot Depth & Liquidation Cascade Risk
- *
- * Drop into: app/components/SpotDepthCard.tsx
- *
- * USAGE IN app/page.tsx
- * ─────────────────────────────────────────────────────────────────────────────
- * 1. Import at top:
- *      import SpotDepthCard from "./components/SpotDepthCard";
- *
- * 2. Add state:
- *      const [spotDepth, setSpotDepth] = useState<SpotDepthData | null>(null);
- *
- * 3. Add to fetchAll():
- *      try {
- *        const depthRes  = await fetch(`${API}/liquidity/depth`);
- *        const depthJson = await depthRes.json();
- *        if (!depthJson.error) setSpotDepth(depthJson);
- *      } catch (e) { console.warn("[SpotDepth] fetch failed", e); }
- *
- * 4. Add to JSX (e.g. after the 8 metric cards in Section I, or new section):
- *      {spotDepth && <SpotDepthCard data={spotDepth} />}
- *
- * TYPE — add to page.tsx type block:
- *      type SpotDepthData = Parameters<typeof SpotDepthCard>[0]["data"];
- *    Or paste the SpotDepthData interface below directly into page.tsx.
- * ─────────────────────────────────────────────────────────────────────────────
- */
+import type {
+  AlertLevel,
+  SpotDepthData,
+} from "@/app/types/btc-dashboard";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type AlertLevel = "extreme" | "notable" | "neutral" | "none";
-
-interface VenueBreakdown {
-  bid_2pct_usd: string;
-  ask_2pct_usd: string;
-  share_pct:    number;
-}
-
-export interface SpotDepthData {
-  name:         string;
-  category:     string;
-  current:      string;       // adjusted coverage ratio, e.g. "1.34x"
-  current_dir:  "up" | "down" | "flat";
-  alert:        string;
-  alert_level:  AlertLevel;
-  pattern:      string;
-
-  spot_price_usd:         number;
-  bid_depth_0_5pct_usd:  string;
-  bid_depth_1_0pct_usd:  string;
-  bid_depth_2_0pct_usd:  string;
-  ask_depth_2_0pct_usd:  string;
-  visible_depth_usd:      string;
-  adjusted_depth_usd:     string;
-  depth_haircut_pct:      string;
-  haircut_reason:         "stressed" | "normal";
-
-  depth_coverage_ratio:   number | null;
-  adjusted_coverage:      number | null;
-
-  liquidation_estimate_usd: string;
-  liquidation_source:       string;
-  oi_usd:                   string;
-  oi_age_seconds?:           number | null;
-  leverage_context_source?:  string;
-
-  slippage_estimate:       string;
-  depth_vs_median_pct:     number | null;
-  depth_history_days?:     number;
-  depth_history_samples?:  number;
-  venue_concentration_pct: number;
-  venues_online:           string[];
-
-  cascade_risk_label:  string;
-  cascade_risk_level:  AlertLevel;
-
-  oi_alert_level:      AlertLevel;
-  funding_alert_level: AlertLevel;
-
-  venue_breakdown: Record<string, VenueBreakdown>;
-
-  updated_at: string;
-}
+/** Spot Depth and liquidation-cascade context for the BTC dashboard. */
 
 // ─── Style helpers (mirrors alertClasses in page.tsx) ────────────────────────
 

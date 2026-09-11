@@ -1,0 +1,29 @@
+"use client";
+
+import { useState } from "react";
+import { ChevronRight, FileText } from "lucide-react";
+import { getApiUrl } from "@/app/lib/dashboard-api";
+import type { TradeLog } from "@/app/types/btc-dashboard";
+
+const TradeLogReview = ({ logs, onAdd }: { logs: TradeLog[]; onAdd: () => void }) => {
+  const [showForm, setShowForm] = useState(false); const [saving, setSaving] = useState(false); const [saveError, setSaveError] = useState<string | null>(null);
+  const [form, setForm] = useState({ structure: "", capital: "", read: "", contradiction: "", plan: "", risk: "" });
+  const handleSave = async () => {
+    if (!form.read.trim() || !form.plan.trim()) { setSaveError("Read and plan are required."); return; }
+    setSaving(true); setSaveError(null);
+    try { const res = await fetch(getApiUrl("/trade-log"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); if (!res.ok) throw new Error(`Server returned ${res.status}`); setShowForm(false); setForm({ structure: "", capital: "", read: "", contradiction: "", plan: "", risk: "" }); onAdd(); }
+    catch (e) { setSaveError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
+  };
+  const formFields = [{ key: "structure" as const, label: "Market structure at entry", placeholder: "Range high test, bull flag, breakout retest…" }, { key: "capital" as const, label: "Capital & flow picture", placeholder: "ETF inflow strong, realized cap rising, OI elevated…" }, { key: "read" as const, label: "My read at the time", placeholder: "What I believed was happening when I made this decision…" }, { key: "contradiction" as const, label: "What I was ignoring", placeholder: "The signal that argued against my read…" }, { key: "plan" as const, label: "What I did", placeholder: "Entered long at $X, sized Y%, stop at Z…" }, { key: "risk" as const, label: "Risk taken", placeholder: "Low / Medium / High / Oversized" }];
+  return (
+    <div className="bg-surface border hairline">
+      <div className="flex items-center justify-between px-5 py-4 hairline-b"><div><div className="caps-sm text-faint">IV</div><h2 className="font-display text-paper text-[22px] leading-tight mt-0.5">Review & notes</h2></div><div className="flex items-center gap-4"><span className="caps-sm text-faint">{logs.length} entries</span><button onClick={() => setShowForm(!showForm)} className={`caps-sm px-3 py-1.5 border transition-colors ${showForm ? "border-amber-sand bg-amber-sand-10 text-amber-sand" : "hairline text-muted hover:text-paper hover:border-amber-sand"}`}>{showForm ? "Cancel" : "New entry"}</button></div></div>
+      {showForm && (<div className="px-5 py-4 hairline-b bg-surface-2"><div className="mb-4"><div className="caps-sm text-amber-sand mb-1">Log a trade decision</div><p className="font-sans-body text-muted text-[11px]">Record what the market looked like, what you decided, and why.</p></div>{saveError && <div className="bg-extreme-10 border border-extreme px-3 py-2 mb-3"><span className="caps-sm text-alert-extreme">{saveError}</span></div>}<div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">{formFields.map((f) => (<div key={f.key}><label className="caps-sm text-faint block mb-1.5">{f.label}</label><textarea rows={2} value={form[f.key]} onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))} placeholder={f.placeholder} className="w-full bg-surface-inset border hairline px-2.5 py-2 text-paper text-[12px] font-sans-body resize-none" /></div>))}</div><div className="flex justify-end gap-3"><button onClick={() => setShowForm(false)} className="caps-sm px-3 py-1.5 hairline text-muted hover:text-paper border transition-colors">Cancel</button><button onClick={handleSave} disabled={saving} className={`caps-sm px-3 py-1.5 border transition-colors ${saving ? "border-faint text-faint cursor-not-allowed" : "border-amber-sand text-amber-sand hover:bg-amber-sand-10"}`}>{saving ? "Saving…" : "Log This Trade"}</button></div></div>)}
+      <div className="grid grid-cols-12 caps-sm text-faint px-5 py-2.5 hairline-b bg-surface-inset"><div className="col-span-1">Date</div><div className="col-span-1">Price</div><div className="col-span-2">Structure</div><div className="col-span-3">Read</div><div className="col-span-2">Plan</div><div className="col-span-2">Result</div><div className="col-span-1">Bias</div></div>
+      {logs.length === 0 ? <div className="px-5 py-8 text-center"><span className="caps-sm text-faint">No entries yet — add your first trade log above</span></div> : logs.map((log, i) => (<div key={i} className={`grid grid-cols-12 px-5 py-3 text-[12px] font-sans-body items-center ${i < logs.length - 1 ? "hairline-b" : ""} hover:bg-surface-2 transition-colors`}><div className="col-span-1 font-mono-data text-paper-2">{log.date}</div><div className="col-span-1 font-mono-data text-faint text-[10px]">{log.btc_price ?? "—"}</div><div className="col-span-2 text-paper">{log.structure}</div><div className="col-span-3 text-paper-2 italic">{log.read}</div><div className="col-span-2 text-paper-2">{log.plan}</div><div className={`col-span-2 font-mono-data ${log.result?.startsWith("+") ? "text-neutral-sage" : log.result?.startsWith("-") ? "text-alert-extreme" : "text-muted"}`}>{log.result ?? "Open"}</div><div className="col-span-1 caps-sm text-faint">{log.bias ?? "—"}</div></div>))}
+      <div className="px-5 py-4 hairline-t flex items-center justify-between bg-surface-inset"><div className="flex items-center gap-2 text-faint"><FileText size={12} /><span className="caps-sm">Post-trade SEM review · run weekly with Claude</span></div><button className="caps-sm text-amber-sand hover:underline flex items-center gap-1">Run review <ChevronRight size={11} /></button></div>
+    </div>
+  );
+};
+
+export default TradeLogReview;
