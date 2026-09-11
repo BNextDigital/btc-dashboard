@@ -1,10 +1,33 @@
-export default function PercentileBar({ value }: { value: number }) {
-  const color =
-    value >= 90 || value <= 10
+interface PercentileBarProps {
+  value: number;
+  color?: string;
+  variant?: "default" | "compact";
+}
+
+export default function PercentileBar({
+  value,
+  color,
+  variant = "default",
+}: PercentileBarProps) {
+  const resolvedColor =
+    color ??
+    (value >= 90 || value <= 10
       ? "#C4614A"
       : value >= 75
         ? "#C89A3F"
-        : "#8A8780";
+        : "#8A8780");
+  const width = `${Math.min(100, Math.max(0, value))}%`;
+
+  if (variant === "compact") {
+    return (
+      <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width, backgroundColor: resolvedColor }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -12,8 +35,8 @@ export default function PercentileBar({ value }: { value: number }) {
         <div
           className="absolute top-0 left-0 h-full"
           style={{
-            width: `${value}%`,
-            backgroundColor: color,
+            width,
+            backgroundColor: resolvedColor,
             transition: "width 600ms ease-out",
           }}
         />

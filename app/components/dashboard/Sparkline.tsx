@@ -5,6 +5,9 @@ interface SparklineProps {
   color?: string;
   width?: number;
   height?: number;
+  verticalPadding?: number;
+  className?: string;
+  strokeWidth?: number;
 }
 
 export default function Sparkline({
@@ -14,6 +17,9 @@ export default function Sparkline({
   color,
   width = 80,
   height = 24,
+  verticalPadding = 0,
+  className,
+  strokeWidth = 1.25,
 }: SparklineProps) {
   if (!data || data.length < 2) return null;
 
@@ -26,7 +32,9 @@ export default function Sparkline({
   const points = data
     .map((value, index) => {
       const x = (index / (data.length - 1)) * width;
-      const y = height - ((value - min) / range) * height;
+      const plotHeight = Math.max(0, height - verticalPadding * 2);
+      const y =
+        height - verticalPadding - ((value - min) / range) * plotHeight;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
@@ -37,7 +45,7 @@ export default function Sparkline({
     <svg
       width={width}
       height={height}
-      className="overflow-visible"
+      className={`overflow-visible ${className ?? ""}`}
       aria-hidden="true"
     >
       <polyline
@@ -45,7 +53,7 @@ export default function Sparkline({
         stroke={
           color ?? (resolvedDirection === "down" ? "#C4614A" : "#D9A84D")
         }
-        strokeWidth="1.25"
+        strokeWidth={strokeWidth}
         strokeLinejoin="round"
         strokeLinecap="round"
         points={points}
