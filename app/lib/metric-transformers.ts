@@ -6,7 +6,11 @@ import type {
 } from "@/app/types/btc-dashboard";
 
 const DEDICATED_METRICS = new Set(["stablecoin_supply", "btc_dominance"]);
-const LIVE_DERIVATIVES_METRICS = new Set(["funding", "open_interest"]);
+const LIVE_DERIVATIVES_METRICS = new Set([
+  "funding",
+  "open_interest",
+  "cme_basis",
+]);
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object"
