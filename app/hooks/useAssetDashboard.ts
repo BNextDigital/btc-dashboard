@@ -16,6 +16,14 @@ interface AssetDashboardOptions {
   refreshMs?: number;
 }
 
+interface AssetDashboardBundle<TMetrics, TPrice, TTvl, TSignature> {
+  metrics?: TMetrics;
+  price?: TPrice;
+  summary?: DecisionSummary;
+  tvl?: TTvl;
+  signature?: TSignature;
+}
+
 async function readIfOk<T>(response: Response): Promise<T | null> {
   if (!response.ok) return null;
   return response.json() as Promise<T>;
@@ -42,22 +50,52 @@ export function useAssetDashboard<
 
   const fetchAll = useCallback(async () => {
     try {
-      const responses = await Promise.all([
-        fetch(`${DECISION_DASHBOARD_API}${basePath}/metrics`),
-        fetch(`${DECISION_DASHBOARD_API}${basePath}/price`),
-        fetch(`${DECISION_DASHBOARD_API}${basePath}/summary`),
-        fetch(`${DECISION_DASHBOARD_API}${basePath}/tvl`),
-        fetch(`${DECISION_DASHBOARD_API}${basePath}/${signaturePath}`),
-      ]);
+      const asset = basePath.replace(/^\//, "");
+      const bundleResponse = await fetch(
+        `${DECISION_DASHBOARD_API}/dashboard/${asset}`,
+        { cache: "no-cache" },
+      );
 
-      const [nextMetrics, nextPrice, nextSummary, nextTvl, nextSignature] =
-        await Promise.all([
-          readIfOk<TMetrics>(responses[0]),
-          readIfOk<TPrice>(responses[1]),
-          readIfOk<DecisionSummary>(responses[2]),
-          readIfOk<TTvl>(responses[3]),
-          readIfOk<TSignature>(responses[4]),
+      let bundle: AssetDashboardBundle<TMetrics, TPrice, TTvl, TSignature>;
+
+      if (bundleResponse.ok) {
+        bundle = (await bundleResponse.json()) as AssetDashboardBundle<
+          TMetrics,
+          TPrice,
+          TTvl,
+          TSignature
+        >;
+      } else {
+        // Deployment-safe fallback while the new backend bundle rolls out.
+        const responses = await Promise.all([
+          fetch(`${DECISION_DASHBOARD_API}${basePath}/metrics`),
+          fetch(`${DECISION_DASHBOARD_API}${basePath}/price`),
+          fetch(`${DECISION_DASHBOARD_API}${basePath}/summary`),
+          fetch(`${DECISION_DASHBOARD_API}${basePath}/tvl`),
+          fetch(`${DECISION_DASHBOARD_API}${basePath}/${signaturePath}`),
         ]);
+        const [legacyMetrics, legacyPrice, legacySummary, legacyTvl, legacySignature] =
+          await Promise.all([
+            readIfOk<TMetrics>(responses[0]),
+            readIfOk<TPrice>(responses[1]),
+            readIfOk<DecisionSummary>(responses[2]),
+            readIfOk<TTvl>(responses[3]),
+            readIfOk<TSignature>(responses[4]),
+          ]);
+        bundle = {
+          metrics: legacyMetrics ?? undefined,
+          price: legacyPrice ?? undefined,
+          summary: legacySummary ?? undefined,
+          tvl: legacyTvl ?? undefined,
+          signature: legacySignature ?? undefined,
+        };
+      }
+
+      const nextMetrics = bundle.metrics ?? null;
+      const nextPrice = bundle.price ?? null;
+      const nextSummary = bundle.summary ?? null;
+      const nextTvl = bundle.tvl ?? null;
+      const nextSignature = bundle.signature ?? null;
 
       if (nextMetrics) setMetrics(nextMetrics);
       if (nextPrice) setPrice(nextPrice);
