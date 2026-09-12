@@ -247,6 +247,7 @@ export interface SpotDepthData {
   oi_alert_level: AlertLevel;
   funding_alert_level: AlertLevel;
   venue_breakdown: Record<string, VenueBreakdown>;
+  venue_mid_prices?: Record<string, number>;
   updated_at: string;
 }
 
@@ -362,4 +363,25 @@ export interface DashboardCache {
   proxyStocks?: ProxyStock[];
   etfAum?: EtfAumData;
   ts?: number;
+}
+
+export interface BtcDashboardBundle {
+  asset: "btc";
+  revision: string;
+  generatedAt?: string | null;
+  missingRoutes?: string[];
+  price?: PriceData;
+  metrics?: Record<string, unknown>;
+  summary?: SummaryData;
+  causal?: CausalData;
+  premium?: PremiumData;
+  spotDepth?: SpotDepthData & { error?: string };
+  perpsPressure?: PerpsPressureData;
+  proxyStocks?: {
+    crypto_proxies?: Record<string, ProxyStock>;
+  };
+  news?: {
+    items?: NewsItem[];
+  };
+  etfAum?: EtfAumData;
 }

@@ -19,6 +19,7 @@ import {
   transformLiveMetricsPayload,
 } from "@/app/lib/metric-transformers";
 import type {
+  BtcDashboardBundle,
   CausalData,
   DominanceData,
   EtfAumData,
@@ -36,10 +37,7 @@ import type {
   TradeLog,
 } from "@/app/types/btc-dashboard";
 
-const PRICE_REFRESH_MS = 60_000;
-const FAST_REFRESH_MS = 15 * 60_000;
-const MARKET_REFRESH_MS = 30 * 60_000;
-const HOURLY_REFRESH_MS = 60 * 60_000;
+const DASHBOARD_REFRESH_MS = 15 * 60_000;
 
 const EMPTY_JUDGMENT: JudgmentState = {
   read: "",
@@ -54,6 +52,73 @@ interface HistoricalMetricsResponse {
   error?: string;
   count?: number;
   metrics?: Record<string, unknown>;
+}
+
+async function fetchLegacyBtcBundle(): Promise<BtcDashboardBundle> {
+  const optional = async <T,>(path: string): Promise<T | undefined> => {
+    try {
+      return await fetchJson<T>(path);
+    } catch (error) {
+      console.warn(`[legacy dashboard] ${path}`, error);
+      return undefined;
+    }
+  };
+
+  const [
+    price,
+    metrics,
+    summary,
+    causal,
+    premium,
+    spotDepth,
+    perpsPressure,
+    proxyStocks,
+    news,
+    etfAum,
+  ] = await Promise.all([
+    optional<PriceData>("/price"),
+    optional<Record<string, unknown>>("/metrics"),
+    optional<SummaryData>("/summary"),
+    optional<CausalData>("/causal"),
+    optional<PremiumData>("/btc-premium"),
+    optional<SpotDepthData & { error?: string }>("/liquidity/depth"),
+    optional<PerpsPressureData>("/derivatives/pressure"),
+    optional<{ crypto_proxies?: Record<string, ProxyStock> }>(
+      "/crypto-proxies",
+    ),
+    optional<{ items?: NewsItem[] }>("/news"),
+    optional<EtfAumData>("/etf-aum/metrics"),
+  ]);
+
+  if (!metrics) {
+    throw new Error("Metrics refresh failed");
+  }
+
+  return {
+    asset: "btc",
+    revision: "legacy",
+    price,
+    metrics,
+    summary,
+    causal,
+    premium,
+    spotDepth,
+    perpsPressure,
+    proxyStocks,
+    news,
+    etfAum,
+  };
+}
+
+async function fetchBtcBundle(): Promise<BtcDashboardBundle> {
+  try {
+    return await fetchJson<BtcDashboardBundle>("/dashboard/btc", {
+      cache: "no-cache",
+    });
+  } catch (error) {
+    console.warn("[dashboard bundle] using compatibility routes", error);
+    return fetchLegacyBtcBundle();
+  }
 }
 
 export function useBtcDashboard() {
@@ -94,18 +159,12 @@ export function useBtcDashboard() {
     useState<DominanceData | null>(null);
 
   const inFlightRef = useRef({
-    price: false,
-    fast: false,
-    market: false,
-    hourly: false,
+    dashboard: false,
     user: false,
   });
 
   const lastRefreshRef = useRef({
-    price: 0,
-    fast: 0,
-    market: 0,
-    hourly: 0,
+    dashboard: 0,
   });
 
   const setSelectedDate = useCallback((date: string) => {
@@ -184,182 +243,82 @@ export function useBtcDashboard() {
     return () => window.clearTimeout(restoreTimer);
   }, []);
 
-  const refreshPrice = useCallback(async () => {
-    if (inFlightRef.current.price) return;
-    inFlightRef.current.price = true;
+  const refreshDashboard = useCallback(async () => {
+    if (inFlightRef.current.dashboard) return;
+    inFlightRef.current.dashboard = true;
 
     try {
-      const priceData = await fetchJson<PriceData>("/price");
-      setPrice(priceData);
-      updateDashboardCache({ price: priceData });
-      lastRefreshRef.current.price = Date.now();
-    } catch (refreshError) {
-      console.warn("[price refresh]", refreshError);
-    } finally {
-      inFlightRef.current.price = false;
-    }
-  }, []);
-
-  const refreshFast = useCallback(async () => {
-    if (inFlightRef.current.fast) return;
-    inFlightRef.current.fast = true;
-
-    try {
-      const [
-        metricsResult,
-        summaryResult,
-        causalResult,
-        premiumResult,
-        depthResult,
-        perpsResult,
-      ] = await Promise.allSettled([
-        fetchJson<Record<string, unknown>>("/metrics"),
-        fetchJson<SummaryData>("/summary"),
-        fetchJson<CausalData>("/causal"),
-        fetchJson<PremiumData>("/btc-premium"),
-        fetchJson<SpotDepthData & { error?: string }>("/liquidity/depth"),
-        fetchJson<PerpsPressureData>("/derivatives/pressure"),
-      ]);
-
+      const bundle = await fetchBtcBundle();
       const cachePatch: Parameters<typeof updateDashboardCache>[0] = {};
 
-      if (metricsResult.status === "fulfilled") {
-        const data = metricsResult.value;
-        const transformed = transformLiveMetricsPayload(data);
-        const dedicated = getDedicatedMetrics(data);
-
-        setMetrics(transformed);
-        cachePatch.metrics = transformed;
-
-        if (dedicated.stablecoin) {
-          setStablecoinData(dedicated.stablecoin);
-          cachePatch.stablecoin = dedicated.stablecoin;
-        }
-
-        if (dedicated.dominance) {
-          setDominanceData(dedicated.dominance);
-          cachePatch.dominance = dedicated.dominance;
-        }
-
-        setError(null);
-        setFromCache(false);
-      } else {
-        setError(
-          metricsResult.reason instanceof Error
-            ? metricsResult.reason.message
-            : "Metrics refresh failed",
-        );
+      if (!bundle.metrics) {
+        throw new Error("Dashboard bundle did not include metrics");
       }
 
-      if (summaryResult.status === "fulfilled") {
-        setSummary(summaryResult.value);
-        cachePatch.summary = summaryResult.value;
-      } else {
-        console.warn("[summary refresh]", summaryResult.reason);
+      const transformed = transformLiveMetricsPayload(bundle.metrics);
+      const dedicated = getDedicatedMetrics(bundle.metrics);
+      setMetrics(transformed);
+      cachePatch.metrics = transformed;
+
+      if (dedicated.stablecoin) {
+        setStablecoinData(dedicated.stablecoin);
+        cachePatch.stablecoin = dedicated.stablecoin;
       }
-
-      if (causalResult.status === "fulfilled") {
-        setCausal(causalResult.value);
-        cachePatch.causal = causalResult.value;
-      } else {
-        console.warn("[causal refresh]", causalResult.reason);
+      if (dedicated.dominance) {
+        setDominanceData(dedicated.dominance);
+        cachePatch.dominance = dedicated.dominance;
       }
-
-      if (premiumResult.status === "fulfilled") {
-        setPremiumData(premiumResult.value);
-        cachePatch.premium = premiumResult.value;
-      } else {
-        console.warn("[premium refresh]", premiumResult.reason);
+      if (bundle.price) {
+        setPrice(bundle.price);
+        cachePatch.price = bundle.price;
       }
-
-      if (
-        depthResult.status === "fulfilled" &&
-        depthResult.value &&
-        !depthResult.value.error
-      ) {
-        setSpotDepth(depthResult.value);
-        cachePatch.spotDepth = depthResult.value;
-      } else if (depthResult.status === "rejected") {
-        console.warn("[depth refresh]", depthResult.reason);
+      if (bundle.summary) {
+        setSummary(bundle.summary);
+        cachePatch.summary = bundle.summary;
       }
-
-      if (perpsResult.status === "fulfilled" && perpsResult.value) {
-        setPerpsPressure(perpsResult.value);
-        cachePatch.perpsPressure = perpsResult.value;
-      } else if (perpsResult.status === "rejected") {
-        console.warn("[perps pressure refresh]", perpsResult.reason);
+      if (bundle.causal) {
+        setCausal(bundle.causal);
+        cachePatch.causal = bundle.causal;
       }
-
-      if (Object.keys(cachePatch).length > 0) {
-        updateDashboardCache(cachePatch);
+      if (bundle.premium) {
+        setPremiumData(bundle.premium);
+        cachePatch.premium = bundle.premium;
       }
-
-      lastRefreshRef.current.fast = Date.now();
-    } finally {
-      inFlightRef.current.fast = false;
-      setLoading(false);
-    }
-  }, []);
-
-  const refreshMarket = useCallback(async () => {
-    if (inFlightRef.current.market) return;
-    inFlightRef.current.market = true;
-
-    try {
-      const data = await fetchJson<{
-        crypto_proxies?: Record<string, ProxyStock>;
-      }>("/crypto-proxies");
-
-      if (data.crypto_proxies) {
-        const stocks = Object.values(data.crypto_proxies);
+      if (bundle.spotDepth && !bundle.spotDepth.error) {
+        setSpotDepth(bundle.spotDepth);
+        cachePatch.spotDepth = bundle.spotDepth;
+      }
+      if (bundle.perpsPressure) {
+        setPerpsPressure(bundle.perpsPressure);
+        cachePatch.perpsPressure = bundle.perpsPressure;
+      }
+      if (bundle.proxyStocks?.crypto_proxies) {
+        const stocks = Object.values(bundle.proxyStocks.crypto_proxies);
         setProxyStocks(stocks);
-        updateDashboardCache({ proxyStocks: stocks });
+        cachePatch.proxyStocks = stocks;
+      }
+      if (Array.isArray(bundle.news?.items)) {
+        setNews(bundle.news.items);
+        cachePatch.news = bundle.news.items;
+      }
+      if (bundle.etfAum) {
+        setEtfAum(bundle.etfAum);
+        cachePatch.etfAum = bundle.etfAum;
       }
 
-      lastRefreshRef.current.market = Date.now();
+      updateDashboardCache(cachePatch);
+      setError(null);
+      setFromCache(false);
+      lastRefreshRef.current.dashboard = Date.now();
     } catch (refreshError) {
-      console.warn("[proxy stocks refresh]", refreshError);
+      setError(
+        refreshError instanceof Error
+          ? refreshError.message
+          : "Dashboard refresh failed",
+      );
     } finally {
-      inFlightRef.current.market = false;
-    }
-  }, []);
-
-  const refreshHourly = useCallback(async () => {
-    if (inFlightRef.current.hourly) return;
-    inFlightRef.current.hourly = true;
-
-    try {
-      const [newsResult, etfResult] = await Promise.allSettled([
-        fetchJson<{ items?: NewsItem[] }>("/news"),
-        fetchJson<EtfAumData>("/etf-aum/metrics"),
-      ]);
-
-      const cachePatch: Parameters<typeof updateDashboardCache>[0] = {};
-
-      if (
-        newsResult.status === "fulfilled" &&
-        Array.isArray(newsResult.value.items)
-      ) {
-        setNews(newsResult.value.items);
-        cachePatch.news = newsResult.value.items;
-      } else if (newsResult.status === "rejected") {
-        console.warn("[news refresh]", newsResult.reason);
-      }
-
-      if (etfResult.status === "fulfilled") {
-        setEtfAum(etfResult.value);
-        cachePatch.etfAum = etfResult.value;
-      } else {
-        console.warn("[ETF AUM refresh]", etfResult.reason);
-      }
-
-      if (Object.keys(cachePatch).length > 0) {
-        updateDashboardCache(cachePatch);
-      }
-
-      lastRefreshRef.current.hourly = Date.now();
-    } finally {
-      inFlightRef.current.hourly = false;
+      inFlightRef.current.dashboard = false;
+      setLoading(false);
     }
   }, []);
 
@@ -396,31 +355,16 @@ export function useBtcDashboard() {
 
     try {
       clearDashboardCache();
-      await Promise.all([
-        refreshPrice(),
-        refreshFast(),
-        refreshMarket(),
-        refreshHourly(),
-        refreshUserData(),
-      ]);
+      await Promise.all([refreshDashboard(), refreshUserData()]);
     } finally {
       setRefreshing(false);
     }
-  }, [
-    refreshFast,
-    refreshHourly,
-    refreshMarket,
-    refreshPrice,
-    refreshUserData,
-  ]);
+  }, [refreshDashboard, refreshUserData]);
 
   useEffect(() => {
     const initialRefreshTimer = window.setTimeout(() => {
       if (document.visibilityState === "visible") {
-        void refreshPrice();
-        void refreshFast();
-        void refreshMarket();
-        void refreshHourly();
+        void refreshDashboard();
         void refreshUserData();
       }
     }, 0);
@@ -431,21 +375,9 @@ export function useBtcDashboard() {
       }
     };
 
-    const priceTimer = window.setInterval(
-      () => runVisible(refreshPrice),
-      PRICE_REFRESH_MS,
-    );
-    const fastTimer = window.setInterval(
-      () => runVisible(refreshFast),
-      FAST_REFRESH_MS,
-    );
-    const marketTimer = window.setInterval(
-      () => runVisible(refreshMarket),
-      MARKET_REFRESH_MS,
-    );
-    const hourlyTimer = window.setInterval(
-      () => runVisible(refreshHourly),
-      HOURLY_REFRESH_MS,
+    const dashboardTimer = window.setInterval(
+      () => runVisible(refreshDashboard),
+      DASHBOARD_REFRESH_MS,
     );
 
     const refreshStaleGroups = () => {
@@ -453,17 +385,10 @@ export function useBtcDashboard() {
 
       const now = Date.now();
 
-      if (now - lastRefreshRef.current.price >= PRICE_REFRESH_MS) {
-        void refreshPrice();
-      }
-      if (now - lastRefreshRef.current.fast >= FAST_REFRESH_MS) {
-        void refreshFast();
-      }
-      if (now - lastRefreshRef.current.market >= MARKET_REFRESH_MS) {
-        void refreshMarket();
-      }
-      if (now - lastRefreshRef.current.hourly >= HOURLY_REFRESH_MS) {
-        void refreshHourly();
+      if (
+        now - lastRefreshRef.current.dashboard >= DASHBOARD_REFRESH_MS
+      ) {
+        void refreshDashboard();
       }
     };
 
@@ -472,20 +397,11 @@ export function useBtcDashboard() {
 
     return () => {
       window.clearTimeout(initialRefreshTimer);
-      window.clearInterval(priceTimer);
-      window.clearInterval(fastTimer);
-      window.clearInterval(marketTimer);
-      window.clearInterval(hourlyTimer);
+      window.clearInterval(dashboardTimer);
       document.removeEventListener("visibilitychange", refreshStaleGroups);
       window.removeEventListener("focus", refreshStaleGroups);
     };
-  }, [
-    refreshFast,
-    refreshHourly,
-    refreshMarket,
-    refreshPrice,
-    refreshUserData,
-  ]);
+  }, [refreshDashboard, refreshUserData]);
 
   useEffect(() => {
     if (!selectedDateValue) return;

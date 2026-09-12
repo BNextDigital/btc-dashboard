@@ -3,7 +3,9 @@ import type { DecisionMetric } from "@/app/types/asset-dashboard";
 export const DECISION_DASHBOARD_API =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export const DECISION_REFRESH_MS = 60_000;
+// ETH/SOL are snapshot-backed by the backend's 15-minute collector. Polling
+// five routes every minute only rereads unchanged data.
+export const DECISION_REFRESH_MS = 15 * 60_000;
 
 export const BLANK_DECISION_METRIC: DecisionMetric = {
   current: "—",

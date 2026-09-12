@@ -12,8 +12,14 @@ export function getApiUrl(path: string): string {
   return `${API}${path}`;
 }
 
-export async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(getApiUrl(path), { cache: "no-store" });
+export async function fetchJson<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(getApiUrl(path), {
+    cache: "no-store",
+    ...init,
+  });
 
   if (!response.ok) {
     throw new Error(`${path} returned ${response.status}`);
