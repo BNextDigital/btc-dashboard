@@ -6,12 +6,9 @@ import type {
 } from "@/app/types/btc-dashboard";
 
 const COLORS = {
-  paper: "#E8E6E0",
   amber: "#D9A84D",
   red: "#E05252",
   blue: "#60A5FA",
-  green: "#6A9A6A",
-  muted: "#6B7280",
 };
 
 function clamp(value: number | null | undefined) {
@@ -23,9 +20,22 @@ function fmtPct(value: number | null | undefined, decimals = 2) {
   return `${value > 0 ? "+" : ""}${value.toFixed(decimals)}%`;
 }
 
+function fmtPp(value: number | null | undefined, decimals = 1) {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `${value > 0 ? "+" : ""}${value.toFixed(decimals)}pp`;
+}
+
 function fmtMoney(value: number | null | undefined) {
   if (value == null || Number.isNaN(value)) return "—";
   return `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
+function fmtPrice(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `$${value.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
 }
 
 function primaryColor(side?: string) {
@@ -68,6 +78,7 @@ function Stat({
 
 function MatrixBar({ cell }: { cell?: PressureCell }) {
   const score = cell?.score;
+
   return (
     <div>
       <div className="flex items-center justify-between gap-2 mb-1">
@@ -101,7 +112,14 @@ export default function PerpsPressureCard({
   const positioning = data.positioning;
   const forced = data.forced_flow;
   const liq = data.liquidation_vulnerability;
+  const basis = data.basis_context;
   const accent = primaryColor(state?.primary_side);
+
+  const persistence = carry?.persistence_24h;
+  const persistenceReady =
+    (persistence?.sample_count ?? 0) >= 4 &&
+    (persistence?.coverage_hours ?? 0) >= 6 &&
+    persistence?.dominant_side !== "building_history";
 
   const matrixRows = [
     ["Carry burden", "carry"],
@@ -194,13 +212,7 @@ export default function PerpsPressureCard({
             <Stat
               label="BTC · 24h"
               value={fmtPct(positioning?.price_change_1d_pct, 2)}
-              note={
-                positioning?.price_usd == null
-                  ? "—"
-                  : `$${positioning.price_usd.toLocaleString("en-US", {
-                      maximumFractionDigits: 0,
-                    })}`
-              }
+              note={fmtPrice(positioning?.price_usd)}
             />
           </div>
         </div>
@@ -251,6 +263,108 @@ export default function PerpsPressureCard({
         </div>
       </div>
 
+      {/* CME basis promoted from a tiny context stat into the derivatives cockpit. */}
+      <div className="border-t border-slate-800 p-5 bg-black/10">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 mb-5">
+          <div>
+            <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">
+              CME Basis · Regulated Futures Carry
+            </div>
+            <div
+              className="mt-1"
+              style={{
+                fontFamily: "'Instrument Serif', Georgia, serif",
+                fontSize: 20,
+                color: COLORS.amber,
+              }}
+            >
+              {basis?.regime_label ??
+                (basis?.status === "available"
+                  ? "CME Carry Context"
+                  : "CME Carry Unavailable")}
+            </div>
+          </div>
+
+          {basis?.status === "available" && (
+            <span className="text-[10px] font-mono uppercase text-amber-500 border border-amber-900/50 bg-amber-950/20 rounded px-2 py-1">
+              {basis.trend_5d ?? "—"} 5d
+            </span>
+          )}
+        </div>
+
+        {basis?.status === "available" ? (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-5">
+              <Stat
+                label="CME annualized"
+                value={fmtPct(basis.cme_annualized_pct, 2)}
+                note="dated futures basis"
+              />
+              <Stat
+                label="Perp annualized"
+                value={fmtPct(basis.perp_annualized_pct, 2)}
+                note="if current funding persisted"
+              />
+              <Stat
+                label="Perp − CME"
+                value={fmtPp(basis.spread_vs_perp_pp, 2)}
+                note="structure diagnostic"
+              />
+              <Stat
+                label="Raw basis"
+                value={
+                  basis.raw_basis == null
+                    ? "—"
+                    : String(basis.raw_basis)
+                }
+                note="futures vs spot"
+              />
+              <Stat
+                label="Days to expiry"
+                value={
+                  basis.days_to_exp == null
+                    ? "—"
+                    : `${basis.days_to_exp}d`
+                }
+              />
+              <Stat
+                label="CME future"
+                value={fmtPrice(basis.futures_px)}
+              />
+              <Stat
+                label="Reference spot"
+                value={fmtPrice(basis.spot_px)}
+              />
+              <Stat
+                label="Alert"
+                value={basis.alert && basis.alert !== "—" ? basis.alert : "None"}
+                note={basis.trend_note ?? undefined}
+              />
+            </div>
+
+            <div className="border-t border-slate-900 mt-5 pt-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-start">
+              <div>
+                <div className="text-[9px] font-mono text-slate-600 uppercase tracking-widest mb-1">
+                  Basis vs perps interpretation
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed max-w-4xl">
+                  {basis.interpretation ?? basis.pattern ?? "—"}
+                </p>
+              </div>
+              <div className="text-[9px] font-mono text-slate-700 leading-relaxed lg:max-w-sm">
+                {basis.comparison_note ??
+                  "Perp funding and CME basis use different carry structures; compare them directionally."}
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className="text-[11px] text-slate-500">
+            CME basis snapshot is unavailable. Perps Pressure remains valid from
+            funding, OI and price inputs.
+          </p>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 border-t border-slate-800">
         <div className="p-5 lg:border-r border-slate-800">
           <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-3">
@@ -284,45 +398,77 @@ export default function PerpsPressureCard({
 
         <div className="p-5 lg:border-r border-slate-800">
           <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-3">
-            Persistence & basis
+            Funding persistence
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Stat
-              label="Positive samples"
-              value={fmtPct(carry?.persistence_24h?.positive_share_pct, 0)}
-            />
-            <Stat
-              label="Negative samples"
-              value={fmtPct(carry?.persistence_24h?.negative_share_pct, 0)}
-            />
-            <Stat
-              label="CME basis"
-              value={
-                data.basis_context?.annualized == null
-                  ? "—"
-                  : String(data.basis_context.annualized)
-              }
-              note={data.basis_context?.trend_5d ?? "—"}
-            />
-            <Stat
-              label="Fast history"
-              value={`${carry?.persistence_24h?.coverage_hours ?? 0}h`}
-              note={`${carry?.persistence_24h?.sample_count ?? 0} samples`}
-            />
-          </div>
+
+          {persistenceReady ? (
+            <div className="grid grid-cols-2 gap-4">
+              <Stat
+                label="Positive samples"
+                value={fmtPct(persistence?.positive_share_pct, 0)}
+              />
+              <Stat
+                label="Negative samples"
+                value={fmtPct(persistence?.negative_share_pct, 0)}
+              />
+              <Stat
+                label="Coverage"
+                value={`${persistence?.coverage_hours ?? 0}h`}
+              />
+              <Stat
+                label="Samples"
+                value={String(persistence?.sample_count ?? 0)}
+              />
+            </div>
+          ) : (
+            <div>
+              <div className="font-mono text-sm text-amber-500 uppercase">
+                Building history
+              </div>
+              <div className="text-[11px] text-slate-500 leading-relaxed mt-2">
+                {persistence?.sample_count ?? 0} sample
+                {(persistence?.sample_count ?? 0) === 1 ? "" : "s"} ·{" "}
+                {persistence?.coverage_hours ?? 0}h coverage
+              </div>
+              <div className="text-[9px] font-mono text-slate-700 mt-2">
+                Need ≥4 samples and ≥6h before classifying persistence.
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-5">
           <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-3">
-            Interpretation discipline
+            Data confidence
           </div>
           <div className="font-mono text-sm text-slate-200 uppercase">
-            {data.data_quality?.status ?? "—"}
+            Core data · {data.data_quality?.status ?? "—"}
           </div>
-          <p className="text-[11px] text-slate-500 leading-relaxed mt-2">
+          <div className="grid grid-cols-1 gap-1.5 mt-3 text-[10px] font-mono">
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-600">Funding / OI / price</span>
+              <span className="text-slate-400">
+                {(data.data_quality?.core_inputs_available ?? 0) === 3
+                  ? "Available"
+                  : "Partial"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-600">Persistence</span>
+              <span className="text-slate-400">
+                {persistenceReady ? "Available" : "Building"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-600">Liquidation clusters</span>
+              <span className="text-slate-400">
+                {data.data_quality?.liquidation_clusters ?? "Unavailable"}
+              </span>
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-600 leading-relaxed mt-3">
             Carry = observed · crowding = inferred · forced side = strongly
-            inferred. Heatmap clusters describe vulnerability, not realized
-            fills.
+            inferred. Heatmap clusters describe vulnerability, not realized fills.
           </p>
           <div className="text-[9px] font-mono text-slate-700 mt-3">
             {data.updated_at
