@@ -318,12 +318,26 @@ export interface PerpsPressureData {
     short_cluster_display?: string;
     note?: string;
   };
-  basis_context?: {
+    basis_context?: {
     status?: string;
     annualized?: number | string | null;
+    cme_annualized_pct?: number | null;
+    perp_annualized_pct?: number | null;
+    spread_vs_perp_pp?: number | null;
+    raw_basis?: number | string | null;
+    days_to_exp?: number | null;
+    futures_px?: number | null;
+    spot_px?: number | null;
     trend_5d?: string | null;
+    trend_note?: string | null;
     pattern?: string | null;
     alert?: string | null;
+    alert_level?: string | null;
+    regime_code?: string | null;
+    regime_label?: string | null;
+    interpretation?: string | null;
+    comparison_note?: string | null;
+    source?: string | null;
   };
   data_quality?: {
     status?: string;
