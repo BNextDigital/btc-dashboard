@@ -17,8 +17,9 @@
  * Nav: BTC · Macro · Liquidity (active) · Sector Flows
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import DashboardNav from "../components/DashboardNav";
+import { useVisibleRefresh } from "@/app/hooks/useVisibleRefresh";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,11 +87,16 @@ interface YieldCurveData {
   error?:            string;
 }
 
+interface LiquidityBundle {
+  metrics?: LiquidityMetrics;
+  yieldCurve?: YieldCurveData;
+}
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 min — data is hourly-cached on backend
+const REFRESH_INTERVAL = 4 * 60 * 60 * 1000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -640,17 +646,28 @@ export default function LiquidityDashboard() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [metricsRes, yieldRes] = await Promise.all([
-        fetch(`${API}/liquidity/metrics`),
-        fetch(`${API}/liquidity/yield-curve`),
-      ]);
-      if (!metricsRes.ok) throw new Error(`Backend returned ${metricsRes.status}`);
-      const json: LiquidityMetrics = await metricsRes.json();
-      setData(json);
-      if (yieldRes.ok) {
-        const yj: YieldCurveData = await yieldRes.json();
-        setYieldCurve(yj);
+      const bundleRes = await fetch(`${API}/dashboard/liquidity`, {
+        cache: "no-cache",
+      });
+
+      let bundle: LiquidityBundle = {};
+      if (bundleRes.ok) {
+        bundle = (await bundleRes.json()) as LiquidityBundle;
       }
+
+      if (!bundle.metrics || !bundle.yieldCurve) {
+        const [metricsRes, yieldRes] = await Promise.all([
+          fetch(`${API}/liquidity/metrics`),
+          fetch(`${API}/liquidity/yield-curve`),
+        ]);
+        if (!metricsRes.ok) throw new Error(`Backend returned ${metricsRes.status}`);
+        bundle.metrics ??= (await metricsRes.json()) as LiquidityMetrics;
+        if (yieldRes.ok) {
+          bundle.yieldCurve ??= (await yieldRes.json()) as YieldCurveData;
+        }
+      }
+      setData(bundle.metrics);
+      if (bundle.yieldCurve) setYieldCurve(bundle.yieldCurve);
       setLastUpdated(
         new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
       );
@@ -670,11 +687,7 @@ export default function LiquidityDashboard() {
     fetchAll();
   };
 
-  useEffect(() => {
-    fetchAll();
-    const t = setInterval(fetchAll, REFRESH_INTERVAL);
-    return () => clearInterval(t);
-  }, [fetchAll]);
+  useVisibleRefresh(fetchAll, REFRESH_INTERVAL);
 
   return (
     <main className="min-h-screen p-6"
@@ -802,10 +815,10 @@ export default function LiquidityDashboard() {
                       Why M2 matters for BTC
                     </div>
                     <p className="text-[13px] leading-relaxed mb-4" style={{ color: "#B8B5AA" }}>
-                      <span style={{ color: "#E8E4D9", fontWeight: 500 }}>M2</span> is the broadest measure of dollar liquidity — cash, checking, savings, and money market funds. When M2 grows, the city's total water supply is expanding. Historically, BTC has rallied 3–6 months after M2 inflects upward, as that new money eventually seeks yield in risk assets.
+                      <span style={{ color: "#E8E4D9", fontWeight: 500 }}>M2</span> is the broadest measure of dollar liquidity — cash, checking, savings, and money market funds. When M2 grows, the city&apos;s total water supply is expanding. Historically, BTC has rallied 3–6 months after M2 inflects upward, as that new money eventually seeks yield in risk assets.
                     </p>
                     <p className="text-[12px] leading-relaxed" style={{ color: "#8A8780" }}>
-                      M2 contractions (rare — 2022–2023 was the first since the 1940s) coincided with BTC's deepest drawdowns. A sustained return to positive YoY M2 growth is a key structural tailwind.
+                      M2 contractions (rare — 2022–2023 was the first since the 1940s) coincided with BTC&apos;s deepest drawdowns. A sustained return to positive YoY M2 growth is a key structural tailwind.
                     </p>
                   </div>
                   <div className="border-t border-slate-900 pt-3 mt-3">

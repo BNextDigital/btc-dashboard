@@ -19,8 +19,9 @@
  * Cache: 10 min backend
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import DashboardNav from "../components/DashboardNav";
+import { useVisibleRefresh } from "@/app/hooks/useVisibleRefresh";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ interface CommodityMetrics {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const REFRESH_INTERVAL = 10 * 60 * 1000;
+const REFRESH_INTERVAL = 30 * 60 * 1000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -353,11 +354,7 @@ export default function CommoditiesDashboard() {
     fetchAll();
   };
 
-  useEffect(() => {
-    fetchAll();
-    const t = setInterval(fetchAll, REFRESH_INTERVAL);
-    return () => clearInterval(t);
-  }, [fetchAll]);
+  useVisibleRefresh(fetchAll, REFRESH_INTERVAL);
 
   const en = data?.energy  ?? {};
   const mt = data?.metals  ?? {};

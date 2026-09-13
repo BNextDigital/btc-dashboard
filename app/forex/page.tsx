@@ -21,8 +21,9 @@
  * Nav: BTC · Macro · Liquidity · Forex (active) · Sector Flows
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import DashboardNav from "../components/DashboardNav";
+import { useVisibleRefresh } from "@/app/hooks/useVisibleRefresh";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ interface ForexMetrics {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const REFRESH_INTERVAL = 5 * 60 * 1000;
+const REFRESH_INTERVAL = 30 * 60 * 1000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -515,11 +516,7 @@ export default function ForexDashboard() {
     fetchAll();
   };
 
-  useEffect(() => {
-    fetchAll();
-    const t = setInterval(fetchAll, REFRESH_INTERVAL);
-    return () => clearInterval(t);
-  }, [fetchAll]);
+  useVisibleRefresh(fetchAll, REFRESH_INTERVAL);
 
   return (
     <main className="min-h-screen p-6"
@@ -572,7 +569,7 @@ export default function ForexDashboard() {
                       <span style={{ color: "#E8E4D9", fontWeight: 500 }}>DXY</span> measures the dollar against a basket of six major currencies (EUR 57.6%, JPY 13.6%, GBP 11.9%, CAD 9.1%, SEK 4.2%, CHF 3.6%). When DXY rises, global risk assets face headwinds — BTC included. When DXY falls, it signals easing USD pressure globally and has historically been one of the cleanest macro tailwinds for BTC.
                     </p>
                     <p className="text-[12px] leading-relaxed" style={{ color: "#8A8780" }}>
-                      The relationship isn't mechanical — BTC can rally through a rising DXY if ETF inflows and on-chain demand are strong enough to override macro headwinds. The key question: is capital coming in despite the wind?
+                      The relationship isn&apos;t mechanical — BTC can rally through a rising DXY if ETF inflows and on-chain demand are strong enough to override macro headwinds. The key question: is capital coming in despite the wind?
                     </p>
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-3 border-t border-slate-900 pt-4">
@@ -657,7 +654,7 @@ export default function ForexDashboard() {
                     FX vol and BTC
                   </div>
                   <p className="text-[13px] leading-relaxed mb-3" style={{ color: "#B8B5AA" }}>
-                    <span style={{ color: "#E8E4D9", fontWeight: 500 }}>EVZ</span> measures implied volatility on EUR/USD options — the market's expectation of future FX turbulence. Spikes in FX vol typically precede broader deleveraging as currency uncertainty makes leveraged positions harder to hold.
+                    <span style={{ color: "#E8E4D9", fontWeight: 500 }}>EVZ</span> measures implied volatility on EUR/USD options — the market&apos;s expectation of future FX turbulence. Spikes in FX vol typically precede broader deleveraging as currency uncertainty makes leveraged positions harder to hold.
                   </p>
                   <p className="text-[12px] leading-relaxed" style={{ color: "#8A8780" }}>
                     The <span style={{ color: "#B8B5AA" }}>Broad USD Index (DTWEXBGS)</span> from FRED provides the long-run dollar trend vs 26 trading partners — broader than DXY and harder to manipulate by short-term flows.
