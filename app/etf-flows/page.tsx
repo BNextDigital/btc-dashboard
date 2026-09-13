@@ -12,8 +12,9 @@
  * Nav: DashboardNav (shared component)
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import DashboardNav from "../components/DashboardNav";
+import { useVisibleRefresh } from "@/app/hooks/useVisibleRefresh";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,12 @@ interface CustodyData {
   updated_at:    string;
   coverage_note: string;
   wallets:       WalletEntry[];
+}
+
+interface EtfFlowsBundle {
+  summary?: SummaryData;
+  breakdown?: BreakdownData;
+  custody?: CustodyData;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -341,10 +348,10 @@ function BreakdownTable({
       return sortDir * (av - bv);
     });
 
-  const SortBtn = ({ k, label }: { k: typeof sortKey; label: string }) => (
-    <button onClick={() => toggleSort(k)}
-      className={`text-[9px] font-mono uppercase tracking-widest hover:text-slate-300 transition-colors ${sortKey === k ? "text-amber-500" : "text-slate-600"}`}>
-      {label}{sortKey === k ? (sortDir === -1 ? " ↓" : " ↑") : ""}
+  const sortButton = (key: typeof sortKey, label: string) => (
+    <button onClick={() => toggleSort(key)}
+      className={`text-[9px] font-mono uppercase tracking-widest hover:text-slate-300 transition-colors ${sortKey === key ? "text-amber-500" : "text-slate-600"}`}>
+      {label}{sortKey === key ? (sortDir === -1 ? " ↓" : " ↑") : ""}
     </button>
   );
 
@@ -366,10 +373,10 @@ function BreakdownTable({
       {/* Header row */}
       <div className="px-5 py-3 border-b border-slate-900 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <SortBtn k="ticker" label="Ticker" />
+          {sortButton("ticker", "Ticker")}
           <span className="text-slate-800">·</span>
-          {!isOtc && <><SortBtn k="btc_onchain" label="Balance" /><span className="text-slate-800">·</span></>}
-          <SortBtn k="btc_24h_net" label="24h Net" />
+          {!isOtc && <>{sortButton("btc_onchain", "Balance")}<span className="text-slate-800">·</span></>}
+          {sortButton("btc_24h_net", "24h Net")}
         </div>
         {data && (
           <div className="text-[9px] font-mono text-slate-700">{formatTime(data.updated_at)}</div>
@@ -624,16 +631,36 @@ export default function EtfFlowsDashboard() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [sRes, bRes, cRes] = await Promise.all([
-        fetch(`${API}/etf-flows/summary`),
-        fetch(`${API}/etf-flows/breakdown`),
-        fetch(`${API}/etf-flows/custody`),
-      ]);
-      const [s, b, c] = await Promise.all([
-        sRes.ok ? sRes.json() : null,
-        bRes.ok ? bRes.json() : null,
-        cRes.ok ? cRes.json() : null,
-      ]);
+      const bundleRes = await fetch(`${API}/dashboard/etf-flows`, {
+        cache: "no-cache",
+      });
+
+      let s: SummaryData | null = null;
+      let b: BreakdownData | null = null;
+      let c: CustodyData | null = null;
+
+      if (bundleRes.ok) {
+        const bundle = (await bundleRes.json()) as EtfFlowsBundle;
+        s = bundle.summary ?? null;
+        b = bundle.breakdown ?? null;
+        c = bundle.custody ?? null;
+      }
+
+      if (!s || !b || !c) {
+        const [sRes, bRes, cRes] = await Promise.all([
+          fetch(`${API}/etf-flows/summary`),
+          fetch(`${API}/etf-flows/breakdown`),
+          fetch(`${API}/etf-flows/custody`),
+        ]);
+        const [legacyS, legacyB, legacyC] = await Promise.all([
+          sRes.ok ? sRes.json() : null,
+          bRes.ok ? bRes.json() : null,
+          cRes.ok ? cRes.json() : null,
+        ]);
+        s ??= legacyS;
+        b ??= legacyB;
+        c ??= legacyC;
+      }
       if (s) setSummary(s);
       if (b) setBreakdown(b);
       if (c) setCustody(c);
@@ -648,11 +675,7 @@ export default function EtfFlowsDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchAll();
-    const t = setInterval(fetchAll, REFRESH);
-    return () => clearInterval(t);
-  }, [fetchAll]);
+  useVisibleRefresh(fetchAll, REFRESH);
 
   return (
     <>

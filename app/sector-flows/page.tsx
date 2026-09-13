@@ -26,8 +26,9 @@
  * Cache: 5 min backend (OHLCV + shared yf_cache Close prices)
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import DashboardNav from "../components/DashboardNav";
+import { useVisibleRefresh } from "@/app/hooks/useVisibleRefresh";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -156,7 +157,7 @@ interface SectorFlowsResponse {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const REFRESH_INTERVAL = 5 * 60 * 1000;
+const REFRESH_INTERVAL = 30 * 60 * 1000;
 
 const GROUP_ORDER = [
   "technology", "financials", "consumer", "healthcare",
@@ -863,11 +864,7 @@ export default function SectorCapitalFlowMatrix() {
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    fetchData();
-    const t = setInterval(fetchData, REFRESH_INTERVAL);
-    return () => clearInterval(t);
-  }, [fetchData]);
+  useVisibleRefresh(fetchData, REFRESH_INTERVAL);
 
   const cotEntries = data?.cot
     ? (Object.entries(data.cot).filter(([k]) => k !== "error") as [string, COTAsset][])

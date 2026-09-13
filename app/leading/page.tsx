@@ -12,8 +12,9 @@
  * Add nav link in: app/page.tsx and app/macro/page.tsx headers → href="/leading"
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import DashboardNav from "../components/DashboardNav";
+import { useVisibleRefresh } from "@/app/hooks/useVisibleRefresh";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ interface LeadingAll {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 min — /leading/all is slow
+const REFRESH_INTERVAL = 15 * 60 * 1000;
 
 // ─── Alert helpers ────────────────────────────────────────────────────────────
 
@@ -353,7 +354,6 @@ export default function LeadingPage() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>("");
-  const [flushing, setFlushing]   = useState(false);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -374,20 +374,11 @@ export default function LeadingPage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchAll();
-    const t = setInterval(fetchAll, REFRESH_INTERVAL);
-    return () => clearInterval(t);
-  }, [fetchAll]);
+  useVisibleRefresh(fetchAll, REFRESH_INTERVAL);
 
   const flushCache = async () => {
-    setFlushing(true);
-    try {
-      await fetch(`${API}/leading/cache/flush`);
-      await fetchAll();
-    } finally {
-      setFlushing(false);
-    }
+    await fetch(`${API}/leading/cache/flush`);
+    await fetchAll();
   };
 
   // Short-term: 1-7 day signals
