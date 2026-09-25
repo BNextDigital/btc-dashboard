@@ -46,6 +46,7 @@ export const NAV_ITEMS = [
   { key: "commodities",  href: "/commodities",   label: "Commodities"  },
   { key: "sector-flows", href: "/sector-flows",  label: "Sector Flows" },
   { key: "leading",      href: "/leading",       label: "Leading"      },
+  { key: "powder-keg",   href: "/powder-keg",    label: "Powder Keg"   },
   { key: "etf-flows",    href: "/etf-flows",     label: "ETF Flows"    },
 ] as const;
 
