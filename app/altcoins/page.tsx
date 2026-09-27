@@ -26,6 +26,14 @@ function fmtSignedPct(value: number | null | undefined) {
   return value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
+function fmtSignedPp(value: number | null | undefined) {
+  return value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(1)}pp`;
+}
+
+function qualifier(...parts: Array<string | null | undefined>) {
+  return parts.filter(Boolean).join(" · ");
+}
+
 function fmtCap(value: number | null | undefined) {
   if (value == null) return "—";
   if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
@@ -187,25 +195,39 @@ export default function AltcoinView() {
                 <StatCard
                   label="Altcoin market cap"
                   value={fmtCap(market?.altcoin_market_cap)}
-                  detail="Market-cap change is descriptive and is not treated as net capital inflow."
-                  source={`${market?.provenance.source_type ?? "—"} · ${market?.provenance.source ?? "—"}`}
+                  detail={qualifier(
+                    `7D ${fmtSignedPct(market?.change_7d_pct)}`,
+                    `30D ${fmtSignedPct(market?.change_30d_pct)}`,
+                  )}
+                  source={`${market?.provenance.source_type ?? "—"} · ${market?.provenance.source ?? "—"} · Δ market cap ≠ net inflow`}
                 />
                 <StatCard
                   label="BTC dominance"
                   value={fmtPct(market?.btc_dominance)}
-                  detail="Context for market-share rotation; not a substitute for breadth."
+                  detail={qualifier(
+                    market?.btc_dominance_change_7d_pp == null ? "7D history accumulating" : `7D ${fmtSignedPp(market.btc_dominance_change_7d_pp)}`,
+                    market?.btc_dominance_change_30d_pp == null ? null : `30D ${fmtSignedPp(market.btc_dominance_change_30d_pp)}`,
+                  )}
                   source={market?.provenance.source}
                 />
                 <StatCard
                   label="CMC20"
                   value={benchmarks?.cmc20?.value == null ? "—" : benchmarks.cmc20.value.toFixed(2)}
-                  detail={benchmarks?.cmc20 ? `24H ${fmtSignedPct(benchmarks.cmc20.change_24h_pct)}` : "Comparator unavailable"}
+                  detail={benchmarks?.cmc20 ? qualifier(
+                    `24H ${fmtSignedPct(benchmarks.cmc20.change_24h_pct)}`,
+                    `7D ${fmtSignedPct(benchmarks.cmc20.change_7d_pct)}`,
+                    `30D ${fmtSignedPct(benchmarks.cmc20.change_30d_pct)}`,
+                  ) : "Comparator unavailable"}
                   source={benchmarks?.cmc20?.source}
                 />
                 <StatCard
                   label="CMC100"
                   value={benchmarks?.cmc100?.value == null ? "—" : benchmarks.cmc100.value.toFixed(2)}
-                  detail={benchmarks?.cmc100 ? `24H ${fmtSignedPct(benchmarks.cmc100.change_24h_pct)}` : "Comparator unavailable"}
+                  detail={benchmarks?.cmc100 ? qualifier(
+                    `24H ${fmtSignedPct(benchmarks.cmc100.change_24h_pct)}`,
+                    `7D ${fmtSignedPct(benchmarks.cmc100.change_7d_pct)}`,
+                    `30D ${fmtSignedPct(benchmarks.cmc100.change_30d_pct)}`,
+                  ) : "Comparator unavailable"}
                   source={benchmarks?.cmc100?.source}
                 />
               </div>
@@ -218,18 +240,18 @@ export default function AltcoinView() {
                 subtitle="Primary internally derived signal"
               />
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <StatCard label="Above 20DMA" value={fmtPct(breadth?.above_20dma_pct)} source="INTERNAL_DERIVED · Binance" />
-                <StatCard label="Above 50DMA" value={fmtPct(breadth?.above_50dma_pct)} source="INTERNAL_DERIVED · Binance" />
-                <StatCard label="Above 200DMA" value={fmtPct(breadth?.above_200dma_pct)} detail={`${breadth?.eligible_200dma ?? 0} eligible assets`} source="INTERNAL_DERIVED · Binance" />
-                <StatCard label="Above 200DMA · ex ETH" value={fmtPct(breadth?.ex_eth_above_200dma_pct)} source="INTERNAL_DERIVED · Binance" />
+                <StatCard label="Above 20DMA" value={fmtPct(breadth?.above_20dma_pct)} detail={qualifier(`7D ${fmtSignedPp(breadth?.above_20dma_change_7d_pp)}`, `30D ${fmtSignedPp(breadth?.above_20dma_change_30d_pp)}`)} source="INTERNAL_DERIVED · Binance" />
+                <StatCard label="Above 50DMA" value={fmtPct(breadth?.above_50dma_pct)} detail={qualifier(`7D ${fmtSignedPp(breadth?.above_50dma_change_7d_pp)}`, `30D ${fmtSignedPp(breadth?.above_50dma_change_30d_pp)}`)} source="INTERNAL_DERIVED · Binance" />
+                <StatCard label="Above 200DMA" value={fmtPct(breadth?.above_200dma_pct)} detail={qualifier(`7D ${fmtSignedPp(breadth?.above_200dma_change_7d_pp)}`, `30D ${fmtSignedPp(breadth?.above_200dma_change_30d_pp)}`, `${breadth?.eligible_200dma ?? 0} eligible`)} source="INTERNAL_DERIVED · Binance" />
+                <StatCard label="Above 200DMA · ex ETH" value={fmtPct(breadth?.ex_eth_above_200dma_pct)} detail={qualifier(`vs all ${fmtSignedPp(breadth?.ex_eth_vs_all_200dma_pp)}`, `${breadth?.eligible_ex_eth_200dma ?? 0} eligible`)} source="INTERNAL_DERIVED · Binance" />
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <StatCard label="Median vs 20DMA" value={fmtSignedPct(breadth?.median_distance_20dma)} />
-                <StatCard label="Median vs 50DMA" value={fmtSignedPct(breadth?.median_distance_50dma)} />
-                <StatCard label="Median vs 200DMA" value={fmtSignedPct(breadth?.median_distance_200dma)} />
-                <StatCard label="30D highs" value={fmtPct(breadth?.highs_30d_pct)} />
-                <StatCard label="90D highs" value={fmtPct(breadth?.highs_90d_pct)} />
+                <StatCard label="Median vs 20DMA" value={fmtSignedPct(breadth?.median_distance_20dma)} detail={`${breadth?.coverage.eligible_20dma ?? breadth?.universe_size ?? 0} eligible assets`} />
+                <StatCard label="Median vs 50DMA" value={fmtSignedPct(breadth?.median_distance_50dma)} detail={`${breadth?.coverage.eligible_50dma ?? breadth?.universe_size ?? 0} eligible assets`} />
+                <StatCard label="Median vs 200DMA" value={fmtSignedPct(breadth?.median_distance_200dma)} detail={`${breadth?.eligible_200dma ?? 0} eligible assets`} />
+                <StatCard label="30D highs" value={fmtPct(breadth?.highs_30d_pct)} detail={`${breadth?.coverage.eligible_highs_30d ?? 0} eligible assets`} />
+                <StatCard label="90D highs" value={fmtPct(breadth?.highs_90d_pct)} detail={`${breadth?.coverage.eligible_highs_90d ?? 0} eligible assets`} />
               </div>
 
               {breadth?.live_above_200dma_pct != null && (
@@ -256,22 +278,31 @@ export default function AltcoinView() {
                 subtitle="Are altcoins gaining leadership against BTC?"
               />
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <StatCard label="ETH / BTC" value={rotation?.eth_btc == null ? "—" : rotation.eth_btc.toFixed(5)} />
-                <StatCard label="Alts > BTC · 7D" value={fmtPct(rotation?.outperforming_btc_7d_pct)} />
-                <StatCard label="Alts > BTC · 30D" value={fmtPct(rotation?.outperforming_btc_30d_pct)} detail={rotation?.median_relative_return_btc_30d == null ? undefined : `Median relative return ${fmtSignedPct(rotation.median_relative_return_btc_30d)}`} />
-                <StatCard label="Alts > BTC · 90D" value={fmtPct(rotation?.outperforming_btc_90d_pct)} />
+                <StatCard label="ETH / BTC" value={rotation?.eth_btc == null ? "—" : rotation.eth_btc.toFixed(5)} detail={qualifier(`7D ${fmtSignedPct(rotation?.eth_btc_change_7d_pct)}`, `30D ${fmtSignedPct(rotation?.eth_btc_change_30d_pct)}`)} />
+                <StatCard label="Alts > BTC · 7D" value={fmtPct(rotation?.outperforming_btc_7d_pct)} detail={`${rotation?.eligible_relative_7d ?? 0} eligible assets`} />
+                <StatCard label="Alts > BTC · 30D" value={fmtPct(rotation?.outperforming_btc_30d_pct)} detail={qualifier(
+                    rotation?.median_relative_return_btc_30d == null ? undefined : `Median ${fmtSignedPct(rotation.median_relative_return_btc_30d)}`,
+                    `${rotation?.eligible_relative_30d ?? 0} eligible`,
+                  )} />
+                <StatCard label="Alts > BTC · 90D" value={fmtPct(rotation?.outperforming_btc_90d_pct)} detail={`${rotation?.eligible_relative_90d ?? 0} eligible assets`} />
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <StatCard
                   label="Alts > ETH · 30D"
                   value={fmtPct(rotation?.outperforming_eth_30d_pct)}
-                  detail={rotation?.median_relative_return_eth_30d == null ? undefined : `Median relative return ${fmtSignedPct(rotation.median_relative_return_eth_30d)}`}
+                  detail={qualifier(
+                    rotation?.median_relative_return_eth_30d == null ? undefined : `Median ${fmtSignedPct(rotation.median_relative_return_eth_30d)}`,
+                    `${rotation?.eligible_relative_eth_30d ?? 0} eligible`,
+                  )}
                   source="INTERNAL_DERIVED · Binance"
                 />
                 <StatCard
                   label="External comparator · CMC Altcoin Season"
                   value={benchmarks?.external_altseason_index?.value == null ? "—" : benchmarks.external_altseason_index.value.toFixed(0)}
-                  detail="Comparator only. It does not determine the internal Altcoin State."
+                  detail={qualifier(
+                    `7D ${fmtSignedPp(benchmarks?.external_altseason_index?.change_7d)}`,
+                    `30D ${fmtSignedPp(benchmarks?.external_altseason_index?.change_30d)}`,
+                  )}
                   source={benchmarks?.external_altseason_index?.source}
                 />
               </div>
