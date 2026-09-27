@@ -53,6 +53,11 @@ export interface AltcoinBreadth {
     with_any_history: number;
     with_minimum_history: number;
     minimum_days: number;
+    eligible_20dma?: number;
+    eligible_50dma?: number;
+    eligible_200dma?: number;
+    eligible_highs_30d?: number;
+    eligible_highs_90d?: number;
   };
   provenance: AltcoinProvenance;
 }
