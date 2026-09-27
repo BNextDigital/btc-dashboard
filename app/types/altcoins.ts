@@ -19,6 +19,10 @@ export interface AltcoinMarket {
   total_market_cap: number | null;
   btc_dominance: number | null;
   timestamp: string | null;
+  change_7d_pct?: number | null;
+  change_30d_pct?: number | null;
+  btc_dominance_change_7d_pp?: number | null;
+  btc_dominance_change_30d_pp?: number | null;
   provenance: AltcoinProvenance;
 }
 
@@ -26,8 +30,14 @@ export interface AltcoinBreadth {
   universe_size: number;
   eligible_200dma: number;
   above_20dma_pct: number | null;
+  above_20dma_change_7d_pp?: number | null;
+  above_20dma_change_30d_pp?: number | null;
   above_50dma_pct: number | null;
+  above_50dma_change_7d_pp?: number | null;
+  above_50dma_change_30d_pp?: number | null;
   above_200dma_pct: number | null;
+  above_200dma_change_7d_pp?: number | null;
+  above_200dma_change_30d_pp?: number | null;
   ex_eth_above_200dma_pct: number | null;
   live_above_200dma_pct: number | null;
   median_distance_20dma: number | null;
@@ -47,6 +57,12 @@ export interface AltcoinBreadth {
 
 export interface AltcoinRotation {
   eth_btc: number | null;
+  eth_btc_change_7d_pct?: number | null;
+  eth_btc_change_30d_pct?: number | null;
+  eligible_relative_7d?: number;
+  eligible_relative_30d?: number;
+  eligible_relative_90d?: number;
+  eligible_relative_eth_30d?: number;
   outperforming_btc_7d_pct: number | null;
   outperforming_btc_30d_pct: number | null;
   outperforming_btc_90d_pct: number | null;
@@ -57,11 +73,13 @@ export interface AltcoinRotation {
 }
 
 export interface AltcoinBenchmarks {
-  btc?: { change_30d: number | null };
-  eth?: { change_30d: number | null };
+  btc?: { change_7d?: number | null; change_30d: number | null };
+  eth?: { change_7d?: number | null; change_30d: number | null };
   cmc20?: {
     value: number | null;
     change_24h_pct: number | null;
+    change_7d_pct?: number | null;
+    change_30d_pct?: number | null;
     timestamp: string | null;
     source: string;
   } | null;
@@ -73,6 +91,10 @@ export interface AltcoinBenchmarks {
   } | null;
   external_altseason_index?: {
     value: number | null;
+    change_7d?: number | null;
+    change_30d?: number | null;
+    altcoin_market_cap_change_7d_pct?: number | null;
+    altcoin_market_cap_change_30d_pct?: number | null;
     timestamp: string | null;
     source: string;
   } | null;
