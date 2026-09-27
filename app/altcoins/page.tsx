@@ -199,7 +199,7 @@ export default function AltcoinView() {
                     `7D ${fmtSignedPct(market?.change_7d_pct)}`,
                     `30D ${fmtSignedPct(market?.change_30d_pct)}`,
                   )}
-                  source={`${market?.provenance.source_type ?? "—"} · ${market?.provenance.source ?? "—"}`}
+                  source={`${market?.provenance.source_type ?? "—"} · ${market?.provenance.source ?? "—"} · Δ market cap ≠ net inflow`}
                 />
                 <StatCard
                   label="BTC dominance"
@@ -243,15 +243,15 @@ export default function AltcoinView() {
                 <StatCard label="Above 20DMA" value={fmtPct(breadth?.above_20dma_pct)} detail={qualifier(`7D ${fmtSignedPp(breadth?.above_20dma_change_7d_pp)}`, `30D ${fmtSignedPp(breadth?.above_20dma_change_30d_pp)}`)} source="INTERNAL_DERIVED · Binance" />
                 <StatCard label="Above 50DMA" value={fmtPct(breadth?.above_50dma_pct)} detail={qualifier(`7D ${fmtSignedPp(breadth?.above_50dma_change_7d_pp)}`, `30D ${fmtSignedPp(breadth?.above_50dma_change_30d_pp)}`)} source="INTERNAL_DERIVED · Binance" />
                 <StatCard label="Above 200DMA" value={fmtPct(breadth?.above_200dma_pct)} detail={qualifier(`7D ${fmtSignedPp(breadth?.above_200dma_change_7d_pp)}`, `30D ${fmtSignedPp(breadth?.above_200dma_change_30d_pp)}`, `${breadth?.eligible_200dma ?? 0} eligible`)} source="INTERNAL_DERIVED · Binance" />
-                <StatCard label="Above 200DMA · ex ETH" value={fmtPct(breadth?.ex_eth_above_200dma_pct)} source="INTERNAL_DERIVED · Binance" />
+                <StatCard label="Above 200DMA · ex ETH" value={fmtPct(breadth?.ex_eth_above_200dma_pct)} detail={qualifier(`vs all ${fmtSignedPp(breadth?.ex_eth_vs_all_200dma_pp)}`, `${breadth?.eligible_ex_eth_200dma ?? 0} eligible`)} source="INTERNAL_DERIVED · Binance" />
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <StatCard label="Median vs 20DMA" value={fmtSignedPct(breadth?.median_distance_20dma)} />
-                <StatCard label="Median vs 50DMA" value={fmtSignedPct(breadth?.median_distance_50dma)} />
-                <StatCard label="Median vs 200DMA" value={fmtSignedPct(breadth?.median_distance_200dma)} />
-                <StatCard label="30D highs" value={fmtPct(breadth?.highs_30d_pct)} />
-                <StatCard label="90D highs" value={fmtPct(breadth?.highs_90d_pct)} />
+                <StatCard label="Median vs 20DMA" value={fmtSignedPct(breadth?.median_distance_20dma)} detail={`${breadth?.coverage.eligible_20dma ?? breadth?.universe_size ?? 0} eligible assets`} />
+                <StatCard label="Median vs 50DMA" value={fmtSignedPct(breadth?.median_distance_50dma)} detail={`${breadth?.coverage.eligible_50dma ?? breadth?.universe_size ?? 0} eligible assets`} />
+                <StatCard label="Median vs 200DMA" value={fmtSignedPct(breadth?.median_distance_200dma)} detail={`${breadth?.eligible_200dma ?? 0} eligible assets`} />
+                <StatCard label="30D highs" value={fmtPct(breadth?.highs_30d_pct)} detail={`${breadth?.coverage.eligible_highs_30d ?? 0} eligible assets`} />
+                <StatCard label="90D highs" value={fmtPct(breadth?.highs_90d_pct)} detail={`${breadth?.coverage.eligible_highs_90d ?? 0} eligible assets`} />
               </div>
 
               {breadth?.live_above_200dma_pct != null && (
