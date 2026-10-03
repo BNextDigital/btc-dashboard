@@ -50,9 +50,9 @@ export const SOL_SEED_SPARKS: Record<SolMetricKey, number[]> = {
 
 export const SOL_EVENTS: readonly DecisionEvent[] = [
   {
-    date: "Jul 3",
+    date: "Sep 30, 2026",
     tag: "Structural",
-    text: "OpenUSD confirmed native on Solana — 140+ partners. Stripe making OUSD default for all business transactions on platform.",
+    text: "Open USD launched on Solana, Base, Ethereum and Tempo. Open Standard reported more than 200 partners; Stripe defaults to OUSD on Tempo.",
   },
   {
     date: "Jul 1",
@@ -67,16 +67,16 @@ export const SOL_EVENTS: readonly DecisionEvent[] = [
 ];
 
 export const SOL_CAUSAL_STEPS = [
-  "OUSD announced native on Solana — day-one deployment",
-  "Stripe + Visa signal payment-scale adoption demand",
-  "Stablecoin supply on Solana +$380M this week — pre-launch",
-  "DeFi TVL +$420M — capital anticipating yield opportunities",
-  "Network activity + DEX volume near yearly highs",
-  "CME basis 8.4% — institutional carry trade active",
+  "OUSD launch provides native stablecoin infrastructure on Solana",
+  "Payment-network partners provide distribution potential; actual usage needs measurement",
+  "Check post-launch OUSD supply and transfer activity on Solana",
+  "Compare observed stablecoin liquidity and DeFi participation with the launch thesis",
+  "Track network activity and DEX volume for sustained participation",
+  "Use current CME basis and derivatives data to assess institutional positioning",
 ] as const;
 
 export const SOL_CONTRADICTION =
-  "OUSD is pre-launch. Reserve composition and attestation cadence unpublished. All signals are forward-looking until go-live.";
+  "OUSD is live, but Solana adoption is unmeasured here. Stripe defaults to Tempo; partner announcements alone do not establish Solana payment demand. Monthly reserve attestations are announced, but the latest report has not been reviewed here.";
 
 export const SOL_OVERRIDE_PLACEHOLDER =
   '{"current":"$8.4B","d7":"+$420M","vs30d":"+18%","percentile":71,"alert":"TVL acceleration","level":"notable","pattern":"Capital returning to ecosystem"}';
