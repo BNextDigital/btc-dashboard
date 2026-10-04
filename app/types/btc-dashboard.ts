@@ -97,7 +97,7 @@ export interface EtfAumData {
   d7_pct: string;
   d30_chg: string;
   d30_pct: string;
-  percentile: number;
+  percentile: number | null;
   alert: string;
   alert_level: Exclude<AlertLevel, "neutral">;
   spark: number[];
@@ -110,6 +110,18 @@ export interface EtfAumData {
   etf_count: number;
   note: string;
   updated_at: string;
+  as_of?: string | null;
+  methodology_version?: number;
+  expected_etf_count?: number;
+  history_samples?: number;
+  spark_dates?: string[];
+  comparison_dates?: { d7: string | null; d30: string | null };
+  data_quality?: {
+    status: "ok" | "stale" | "unavailable";
+    missing_tickers: string[];
+    source_stale: boolean;
+    errors: string[];
+  };
 }
 
 export interface SummaryData {
