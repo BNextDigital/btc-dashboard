@@ -69,7 +69,6 @@ export default function BtcDashboard() {
         <MetricsSection
           apiBaseUrl={getApiBaseUrl()}
           error={dashboard.error}
-          etfAum={dashboard.etfAum}
           fromCache={dashboard.fromCache}
           historicalError={dashboard.historicalError}
           historicalLoading={dashboard.historicalLoading}

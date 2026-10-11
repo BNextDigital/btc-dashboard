@@ -90,40 +90,6 @@ export interface ProxyStock {
   spark: number[];
 }
 
-export interface EtfAumData {
-  total_aum: string;
-  total_aum_raw: number | null;
-  d7_chg: string;
-  d7_pct: string;
-  d30_chg: string;
-  d30_pct: string;
-  percentile: number | null;
-  alert: string;
-  alert_level: Exclude<AlertLevel, "neutral">;
-  spark: number[];
-  breakdown: Array<{
-    ticker: string;
-    name: string;
-    aum: string;
-    share_pct: number | null;
-  }>;
-  etf_count: number;
-  note: string;
-  updated_at: string;
-  as_of?: string | null;
-  methodology_version?: number;
-  expected_etf_count?: number;
-  history_samples?: number;
-  spark_dates?: string[];
-  comparison_dates?: { d7: string | null; d30: string | null };
-  data_quality?: {
-    status: "ok" | "stale" | "unavailable";
-    missing_tickers: string[];
-    source_stale: boolean;
-    errors: string[];
-  };
-}
-
 export interface SummaryData {
   structure: string;
   extreme_count: number;
@@ -373,7 +339,6 @@ export interface DashboardCache {
   spotDepth?: SpotDepthData;
   perpsPressure?: PerpsPressureData;
   proxyStocks?: ProxyStock[];
-  etfAum?: EtfAumData;
   ts?: number;
 }
 
@@ -395,5 +360,4 @@ export interface BtcDashboardBundle {
   news?: {
     items?: NewsItem[];
   };
-  etfAum?: EtfAumData;
 }
