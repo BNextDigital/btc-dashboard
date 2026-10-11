@@ -1,18 +1,13 @@
 "use client";
 
 import { AlertCircle } from "lucide-react";
-import EtfAumCard from "@/app/components/btc/EtfAumCard";
 import FundingCard from "@/app/components/btc/FundingCard";
 import MetricCard from "@/app/components/btc/MetricCard";
-import type {
-  EtfAumData,
-  Metric,
-} from "@/app/types/btc-dashboard";
+import type { Metric } from "@/app/types/btc-dashboard";
 
 interface MetricsSectionProps {
   apiBaseUrl?: string;
   error: string | null;
-  etfAum: EtfAumData | null;
   fromCache: boolean;
   historicalError: string | null;
   historicalLoading: boolean;
@@ -54,7 +49,6 @@ function MetricCards({ metrics }: { metrics: Metric[] }) {
 export default function MetricsSection({
   apiBaseUrl,
   error,
-  etfAum,
   fromCache,
   historicalError,
   historicalLoading,
@@ -172,7 +166,6 @@ export default function MetricsSection({
         ) : (
           <MetricCards metrics={metrics} />
         )}
-        {!selectedDate && etfAum && <EtfAumCard data={etfAum} />}
       </div>
     </section>
   );

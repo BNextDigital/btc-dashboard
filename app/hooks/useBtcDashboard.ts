@@ -22,7 +22,6 @@ import type {
   BtcDashboardBundle,
   CausalData,
   DominanceData,
-  EtfAumData,
   JudgmentState,
   Metric,
   NewsItem,
@@ -74,7 +73,6 @@ async function fetchLegacyBtcBundle(): Promise<BtcDashboardBundle> {
     perpsPressure,
     proxyStocks,
     news,
-    etfAum,
   ] = await Promise.all([
     optional<PriceData>("/price"),
     optional<Record<string, unknown>>("/metrics"),
@@ -87,7 +85,6 @@ async function fetchLegacyBtcBundle(): Promise<BtcDashboardBundle> {
       "/crypto-proxies",
     ),
     optional<{ items?: NewsItem[] }>("/news"),
-    optional<EtfAumData>("/etf-aum/metrics"),
   ]);
 
   if (!metrics) {
@@ -106,7 +103,6 @@ async function fetchLegacyBtcBundle(): Promise<BtcDashboardBundle> {
     perpsPressure,
     proxyStocks,
     news,
-    etfAum,
   };
 }
 
@@ -143,7 +139,6 @@ export function useBtcDashboard() {
   const [proxyStocks, setProxyStocks] = useState<ProxyStock[]>([]);
   const [fromCache, setFromCache] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [etfAum, setEtfAum] = useState<EtfAumData | null>(null);
   const [spotDepth, setSpotDepth] = useState<SpotDepthData | null>(null);
   const [perpsPressure, setPerpsPressure] =
     useState<PerpsPressureData | null>(null);
@@ -186,7 +181,7 @@ export function useBtcDashboard() {
       let restored = false;
 
       if (cached.metrics) {
-        setMetrics(cached.metrics);
+        setMetrics(cached.metrics.filter((metric) => metric.id !== "etf_aum"));
         restored = true;
       }
       if (cached.stablecoin) {
@@ -227,10 +222,6 @@ export function useBtcDashboard() {
       }
       if (cached.proxyStocks) {
         setProxyStocks(cached.proxyStocks);
-        restored = true;
-      }
-      if (cached.etfAum) {
-        setEtfAum(cached.etfAum);
         restored = true;
       }
 
@@ -300,10 +291,6 @@ export function useBtcDashboard() {
       if (Array.isArray(bundle.news?.items)) {
         setNews(bundle.news.items);
         cachePatch.news = bundle.news.items;
-      }
-      if (bundle.etfAum) {
-        setEtfAum(bundle.etfAum);
-        cachePatch.etfAum = bundle.etfAum;
       }
 
       updateDashboardCache(cachePatch);
@@ -472,7 +459,6 @@ export function useBtcDashboard() {
     causal,
     dominanceData,
     error,
-    etfAum,
     executions,
     fromCache,
     historicalDominance,

@@ -63,6 +63,7 @@ export function transformLiveMetricsPayload(
   return Object.entries(data)
     .filter(
       ([id]) =>
+        id !== "etf_aum" &&
         !DEDICATED_METRICS.has(id) && !LIVE_DERIVATIVES_METRICS.has(id),
     )
     .map(([id, raw]) => toMetric(id, raw));
@@ -73,7 +74,7 @@ export function transformHistoricalMetricsPayload(
   date: string,
 ): Metric[] {
   return Object.entries(data)
-    .filter(([id]) => !DEDICATED_METRICS.has(id))
+    .filter(([id]) => id !== "etf_aum" && !DEDICATED_METRICS.has(id))
     .map(([id, raw]) => toMetric(id, raw, date));
 }
 
