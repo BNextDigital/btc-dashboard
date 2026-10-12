@@ -2,7 +2,7 @@
 
 import TradingViewEmbed from "@/app/components/TradingViewEmbed";
 import PerpsPressureCard from "@/app/components/PerpsPressureCard";
-import SpotDepthCard from "@/app/components/SpotDepthCard";
+import LiquidityStressCard from "@/app/components/LiquidityStressCard";
 import SectionLabel from "@/app/components/dashboard/SectionLabel";
 import BtcHeader from "@/app/components/btc/BtcHeader";
 import DecisionSection from "@/app/components/btc/DecisionSection";
@@ -57,14 +57,19 @@ export default function BtcDashboard() {
           </section>
         )}
 
-        <section>
-          <SectionLabel
-            numeral="0A"
-            title="Spot Depth for Liquidity Cascade Risk"
-            subtitle="If leverage gets forced, can spot absorb it?"
-          />
-          {dashboard.spotDepth && <SpotDepthCard data={dashboard.spotDepth} />}
-        </section>
+        {!dashboard.selectedDate && dashboard.spotDepth && (
+          <section>
+            <SectionLabel
+              numeral="0A"
+              title="Liquidity Stress"
+              subtitle="Modeled spot pressure · sampled liquidity · directional context"
+            />
+            <LiquidityStressCard
+              depth={dashboard.spotDepth}
+              pressure={dashboard.perpsPressure}
+            />
+          </section>
+        )}
 
         <MetricsSection
           apiBaseUrl={getApiBaseUrl()}

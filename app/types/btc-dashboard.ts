@@ -276,6 +276,7 @@ export interface PerpsPressureData {
     note?: string;
   };
   positioning?: {
+    oi_usd?: number | null;
     oi_display?: string;
     oi_change_24h_pct?: number | null;
     oi_change_7d_pct?: number | null;
